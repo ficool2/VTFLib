@@ -2558,6 +2558,9 @@ namespace VTFEdit
 				case VTF_RSRC_TEXTURE_SETTINGS_EX:
 					sName = "Extended Texture Settings";
 					break;
+				case VTF_RSRC_PARALLAX_CUBEMAP:
+					sName = "Parallax Cubemap";
+					break;
 				case VTF_RSRC_KEY_VALUE_DATA:
 					sName = "Key/Value Data";
 					break;

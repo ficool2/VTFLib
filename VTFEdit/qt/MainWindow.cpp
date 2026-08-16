@@ -1082,6 +1082,7 @@ namespace VTFEdit
 			case VTF_RSRC_TEXTURE_LOD_SETTINGS:		sName = tr("LOD Settings"); break;
 			case VTF_RSRC_TEXTURE_SETTINGS_EX:		sName = tr("Extended Texture Settings"); break;
 			case VTF_RSRC_KEY_VALUE_DATA:			sName = tr("Key/Value Data"); break;
+			case VTF_RSRC_PARALLAX_CUBEMAP:			sName = tr("Parallax Cubemap"); break;
 			default:								sName = tr("Unknown"); break;
 			}
 
@@ -1125,6 +1126,30 @@ namespace VTFEdit
 					new QTreeWidgetItem(pItem, QStringList(tr("Checksum: 0x%1")
 						.arg(hex32(*static_cast<vlUInt *>(lpData)))));
 				}
+				break;
+
+			case VTF_RSRC_PARALLAX_CUBEMAP:
+				if(lpData && uiSize == sizeof(SVTFParallaxCubemapResource))
+				{
+					const SVTFParallaxCubemapResource *pParallax =
+						static_cast<SVTFParallaxCubemapResource *>(lpData);
+
+					new QTreeWidgetItem(pItem, QStringList(tr("Origin: %1, %2, %3, %4")
+						.arg(pParallax->Origin[0]).arg(pParallax->Origin[1])
+						.arg(pParallax->Origin[2]).arg(pParallax->Origin[3])));
+
+					QTreeWidgetItem *pMatrix = new QTreeWidgetItem(pItem, QStringList(tr("Inverse OBB Matrix")));
+					for(vlUInt j = 0; j < 4; j++)
+					{
+						new QTreeWidgetItem(pMatrix, QStringList(tr("%1, %2, %3, %4")
+							.arg(pParallax->InvObbMatrix[j * 4 + 0]).arg(pParallax->InvObbMatrix[j * 4 + 1])
+							.arg(pParallax->InvObbMatrix[j * 4 + 2]).arg(pParallax->InvObbMatrix[j * 4 + 3])));
+					}
+					pMatrix->setExpanded(true);
+					break;
+				}
+
+				new QTreeWidgetItem(pItem, QStringList(tr("Size: %1 B").arg(QLocale().toString(uiSize))));
 				break;
 
 			case VTF_RSRC_TEXTURE_LOD_SETTINGS:
