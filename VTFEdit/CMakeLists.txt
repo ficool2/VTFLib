@@ -32,6 +32,7 @@ qt_add_executable(vtfedit WIN32
 	qt/BatchConvertSettings.h
 	qt/AboutDialog.cpp
 	qt/AboutDialog.h
+	qt/FileDialogHistory.h
 	qt/VTFLibQt.h
 	qt/VTFEdit.rc
 )
