@@ -34,6 +34,7 @@ namespace VTFEdit
 		{ IMAGE_FORMAT_BC4,					"BC4",					true },
 		{ IMAGE_FORMAT_BC5,					"BC5",					true },
 		{ IMAGE_FORMAT_BC6H,				"BC6H",					true },
+		{ IMAGE_FORMAT_BC7,					"BC7",					true },
 		{ IMAGE_FORMAT_R8,					"R8",					true },
 		{ IMAGE_FORMAT_BGRX8888,			"BGRX8888",				false },
 		{ IMAGE_FORMAT_RGB565,				"RGB565",				false },
