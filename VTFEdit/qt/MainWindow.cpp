@@ -2409,7 +2409,11 @@ namespace VTFEdit
 	void MainWindow::onImport()
 	{
 		const QStringList sFileNames = QFileDialog::getOpenFileNames(this, tr("Import"),
-			FileDialogHistory::s_sImageDirectory, tr("All Files (*.*)"));
+			FileDialogHistory::s_sImageDirectory,
+			tr("Supported Files (*.bmp *.dds *.gif *.jpg *.jpeg *.png *.tga);;"
+				"BMP Files (*.bmp);;DDS Files (*.dds);;GIF Files (*.gif);;"
+				"JPEG Files (*.jpg *.jpeg);;PNG Files (*.png);;TGA Files (*.tga);;"
+				"All Files (*.*)"));
 
 		if(!sFileNames.isEmpty())
 		{
