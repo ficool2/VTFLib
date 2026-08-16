@@ -21,6 +21,7 @@
 
 #include "AboutDialog.h"
 #include "BatchConvertDialog.h"
+#include "FileDialogHistory.h"
 #include "ImageView.h"
 #include "SheetDialog.h"
 #include "VmtCreateDialog.h"
@@ -1786,6 +1787,7 @@ namespace VTFEdit
 			if(!bTemp)
 			{
 				addRecentFile(sFileName);
+				FileDialogHistory::remember(FileDialogHistory::s_sFileDirectory, sFileName);
 			}
 		}
 		else if(sFileName.endsWith(QLatin1String(".vmt"), Qt::CaseInsensitive))
@@ -1815,6 +1817,7 @@ namespace VTFEdit
 			if(!bTemp)
 			{
 				addRecentFile(sFileName);
+				FileDialogHistory::remember(FileDialogHistory::s_sFileDirectory, sFileName);
 			}
 
 			m_pVmtEdit->setFocus();
@@ -1881,6 +1884,8 @@ namespace VTFEdit
 		setDocumentModified(pDocument, false);
 		updateTabText(iIndex);
 
+		FileDialogHistory::remember(FileDialogHistory::s_sFileDirectory, sFileName);
+
 		if(iIndex == m_iCurrentDocument)
 		{
 			m_sFileName = sFileName;
@@ -1924,15 +1929,17 @@ namespace VTFEdit
 		const QString &sDefault = pDocument->sFileName.isEmpty()
 			? pDocument->sSuggestedFileName : pDocument->sFileName;
 
+		const QString sStartPath = FileDialogHistory::path(FileDialogHistory::s_sFileDirectory, sDefault);
+
 		if(pDocument->pVTFFile != nullptr)
 		{
 			sFileName = QFileDialog::getSaveFileName(this, tr("Save VTF File"),
-				sDefault, tr("VTF Files (*.vtf)"));
+				sStartPath, tr("VTF Files (*.vtf)"));
 		}
 		else if(pDocument->pVMTFile != nullptr)
 		{
 			sFileName = QFileDialog::getSaveFileName(this, tr("Save VMT File"),
-				sDefault, tr("VMT Files (*.vmt)"));
+				sStartPath, tr("VMT Files (*.vmt)"));
 		}
 
 		if(sFileName.isEmpty())
@@ -1969,9 +1976,9 @@ namespace VTFEdit
 				break;
 			}
 
-			const QByteArray Path = QDir::toNativeSeparators(sFileName).toLocal8Bit();
+			const QByteArray Path = QDir::toNativeSeparators( sFileName ).toLocal8Bit();
 
-			if(!ilLoadImage(Path.constData()))
+			if ( !ilLoadImage( Path.constData() ) )
 			{
 				bError = true;
 
@@ -2250,7 +2257,8 @@ namespace VTFEdit
 
 	void MainWindow::onOpen()
 	{
-		const QString sFileName = QFileDialog::getOpenFileName(this, tr("Open"), QString(),
+		const QString sFileName = QFileDialog::getOpenFileName(this, tr("Open"),
+			FileDialogHistory::s_sFileDirectory,
 			tr("Supported Files (*.vmt *.vtf);;VMT Files (*.vmt);;VTF Files (*.vtf);;All Files (*.*)"));
 
 		if(!sFileName.isEmpty())
@@ -2400,11 +2408,13 @@ namespace VTFEdit
 
 	void MainWindow::onImport()
 	{
-		const QStringList sFileNames = QFileDialog::getOpenFileNames(this, tr("Import"), QString(),
-			tr("All Files (*.*)"));
+		const QStringList sFileNames = QFileDialog::getOpenFileNames(this, tr("Import"),
+			FileDialogHistory::s_sImageDirectory, tr("All Files (*.*)"));
 
 		if(!sFileNames.isEmpty())
 		{
+			FileDialogHistory::remember(FileDialogHistory::s_sImageDirectory, sFileNames.first());
+
 			import(sFileNames);
 		}
 	}
@@ -2412,11 +2422,14 @@ namespace VTFEdit
 	void MainWindow::onExport()
 	{
 		const QString sFileName = QFileDialog::getSaveFileName(this, tr("Export"),
-			QFileInfo(m_sFileName).completeBaseName(),
+			FileDialogHistory::path(FileDialogHistory::s_sImageDirectory,
+				QFileInfo(m_sFileName).completeBaseName()),
 			tr("BMP Files (*.bmp);;JPEG Files (*.jpg *.jpeg);;PNG Files (*.png);;TGA Files (*.tga)"));
 
 		if(!sFileName.isEmpty())
 		{
+			FileDialogHistory::remember(FileDialogHistory::s_sImageDirectory, sFileName);
+
 			exportImage(sFileName);
 		}
 	}
@@ -2424,11 +2437,14 @@ namespace VTFEdit
 	void MainWindow::onExportAll()
 	{
 		const QString sFileName = QFileDialog::getSaveFileName(this, tr("Export All"),
-			QFileInfo(m_sFileName).completeBaseName(),
+			FileDialogHistory::path(FileDialogHistory::s_sImageDirectory,
+				QFileInfo(m_sFileName).completeBaseName()),
 			tr("BMP Files (*.bmp);;JPEG Files (*.jpg *.jpeg);;PNG Files (*.png);;TGA Files (*.tga)"));
 
 		if(!sFileName.isEmpty())
 		{
+			FileDialogHistory::remember(FileDialogHistory::s_sImageDirectory, sFileName);
+
 			exportAllImages(sFileName);
 		}
 	}
@@ -3086,6 +3102,16 @@ namespace VTFEdit
 				m_pMipmapFullSizeAction->setChecked(toBool(sVal));
 			else if(sArg.compare(QLatin1String("VTFEdit.AutoCreateVMTFile"), Qt::CaseInsensitive) == 0)
 				m_pAutoCreateVmtFileAction->setChecked(toBool(sVal));
+			else if(sArg.compare(QLatin1String("VTFEdit.LastFileDirectory"), Qt::CaseInsensitive) == 0)
+			{
+				if(QDir(sVal).exists())
+					FileDialogHistory::s_sFileDirectory = sVal;
+			}
+			else if(sArg.compare(QLatin1String("VTFEdit.LastImageDirectory"), Qt::CaseInsensitive) == 0)
+			{
+				if(QDir(sVal).exists())
+					FileDialogHistory::s_sImageDirectory = sVal;
+			}
 
 			else if(sArg.compare(QLatin1String("VmtEditor.FontFamily"), Qt::CaseInsensitive) == 0)
 			{
@@ -3282,6 +3308,8 @@ namespace VTFEdit
 		Stream << "VTFEdit.Tile = " << boolText(m_pTileAction->isChecked()) << "\n";
 		Stream << "VTFEdit.MipmapFullSize = " << boolText(m_pMipmapFullSizeAction->isChecked()) << "\n";
 		Stream << "VTFEdit.AutoCreateVMTFile = " << boolText(m_pAutoCreateVmtFileAction->isChecked()) << "\n";
+		Stream << "VTFEdit.LastFileDirectory = " << FileDialogHistory::s_sFileDirectory << "\n";
+		Stream << "VTFEdit.LastImageDirectory = " << FileDialogHistory::s_sImageDirectory << "\n";
 		Stream << "VmtEditor.FontFamily = " << m_VmtEditorSettings.sFontFamily << "\n";
 		Stream << "VmtEditor.FontSize = " << m_VmtEditorSettings.iFontSize << "\n";
 		Stream << "VmtEditor.TabSize = " << m_VmtEditorSettings.iTabSize << "\n";

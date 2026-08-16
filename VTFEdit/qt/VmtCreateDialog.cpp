@@ -19,6 +19,7 @@
 
 #include "VmtCreateDialog.h"
 
+#include "FileDialogHistory.h"
 #include "VmtFileUtility.h"
 
 #include <QCheckBox>
@@ -284,10 +285,12 @@ namespace VTFEdit
 		}
 
 		const QString sFileName = QFileDialog::getOpenFileName(this, tr("Open VTF File"),
-			QString(), tr("VTF Files (*.vtf)"));
+			FileDialogHistory::s_sFileDirectory, tr("VTF Files (*.vtf)"));
 
 		if(!sFileName.isEmpty())
 		{
+			FileDialogHistory::remember(FileDialogHistory::s_sFileDirectory, sFileName);
+
 			pEdit->setText(VmtFileUtility::GetTexturePathFromSystemPath(sFileName));
 		}
 	}
@@ -321,12 +324,15 @@ namespace VTFEdit
 		}
 
 		const QString sFileName = QFileDialog::getSaveFileName(this, tr("Save VMT File"),
-			sSuggested, tr("VMT Files (*.vmt)"));
+			FileDialogHistory::path(FileDialogHistory::s_sFileDirectory, sSuggested),
+			tr("VMT Files (*.vmt)"));
 
 		if(sFileName.isEmpty())
 		{
 			return;
 		}
+
+		FileDialogHistory::remember(FileDialogHistory::s_sFileDirectory, sFileName);
 
 		VTFLib::CVMTFile VMTFile;
 		VMTFile.Create(m_pShader->currentText().toLocal8Bit().constData());
