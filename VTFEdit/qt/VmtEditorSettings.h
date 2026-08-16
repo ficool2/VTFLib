@@ -59,7 +59,7 @@ namespace VTFEdit
 			QFont Font(sFontFamily, iFontSize);
 			Font.setFamilies({ sFontFamily, QStringLiteral("Consolas"), QStringLiteral("Cascadia Mono"),
 				QStringLiteral("DejaVu Sans Mono"), QStringLiteral("Courier New") });
-			Font.setStyleHint(QFont::Monospace, QFont::PreferDefault);
+			Font.setStyleHint(QFont::Monospace, QFont::StyleStrategy(QFont::PreferDefault | QFont::NoFontMerging));
 			Font.setFixedPitch(true);
 			return Font;
 		}
