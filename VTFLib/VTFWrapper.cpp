@@ -172,6 +172,17 @@ VTFLIB_API vlBool vlImageCreateMultiple(vlUInt uiWidth, vlUInt uiHeight, vlUInt 
 	return Image->Create(uiWidth, uiHeight, uiFrames, uiFaces, uiSlices, lpImageDataRGBA8888, *VTFCreateOptions);
 }
 
+VTFLIB_API vlBool vlImageCreateMultipleEx(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt uiFaces, vlUInt uiSlices, vlByte **lpImageData, SVTFCreateOptions *VTFCreateOptions, VTFImageFormat SourceFormat)
+{
+	if(Image == 0)
+	{
+		LastError.Set("No image bound.");
+		return vlFalse;
+	}
+
+	return Image->Create(uiWidth, uiHeight, uiFrames, uiFaces, uiSlices, lpImageData, *VTFCreateOptions, SourceFormat);
+}
+
 VTFLIB_API vlVoid vlImageDestroy()
 {
 	if(Image == 0)
@@ -684,9 +695,19 @@ VTFLIB_API vlBool vlImageConvert(vlByte *lpSource, vlByte *lpDest, vlUInt uiWidt
 	return CVTFFile::Convert(lpSource, lpDest, uiWidth, uiHeight, SourceFormat, DestFormat);
 }
 
+VTFLIB_API vlBool vlImageIsFloatFormat(VTFImageFormat Format)
+{
+	return CVTFFile::IsFloatFormat(Format);
+}
+
 VTFLIB_API vlBool vlImageResize(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter, vlBool bSRGB)
 {
 	return CVTFFile::Resize(lpSourceRGBA8888, lpDestRGBA8888, uiSourceWidth, uiSourceHeight, uiDestWidth, uiDestHeight, ResizeFilter, bSRGB);
+}
+
+VTFLIB_API vlBool vlImageResizeRGBA32F(vlSingle *lpSourceRGBA32F, vlSingle *lpDestRGBA32F, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter)
+{
+	return CVTFFile::ResizeRGBA32F(lpSourceRGBA32F, lpDestRGBA32F, uiSourceWidth, uiSourceHeight, uiDestWidth, uiDestHeight, ResizeFilter);
 }
 
 VTFLIB_API vlBool vlImageConvertToDistanceField(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, vlSingle sSpread, vlByte bThreshold, vlBool *pbClipped)
@@ -699,9 +720,19 @@ VTFLIB_API vlVoid vlImageCorrectImageGamma(vlByte *lpImageDataRGBA8888, vlUInt u
 	CVTFFile::CorrectImageGamma(lpImageDataRGBA8888, uiWidth, uiHeight, sGammaCorrection);
 }
 
+VTFLIB_API vlVoid vlImageCorrectImageGammaRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight, vlSingle sGammaCorrection)
+{
+	CVTFFile::CorrectImageGammaRGBA32F(lpImageDataRGBA32F, uiWidth, uiHeight, sGammaCorrection);
+}
+
 VTFLIB_API vlVoid vlImageComputeImageReflectivity(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight, vlSingle *sX, vlSingle *sY, vlSingle *sZ)
 {
 	CVTFFile::ComputeImageReflectivity(lpImageDataRGBA8888, uiWidth, uiHeight, *sX, *sY, *sZ);
+}
+
+VTFLIB_API vlVoid vlImageComputeImageReflectivityRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight, vlSingle *sX, vlSingle *sY, vlSingle *sZ)
+{
+	CVTFFile::ComputeImageReflectivityRGBA32F(lpImageDataRGBA32F, uiWidth, uiHeight, *sX, *sY, *sZ);
 }
 
 VTFLIB_API vlVoid vlImageFlipImage(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight)

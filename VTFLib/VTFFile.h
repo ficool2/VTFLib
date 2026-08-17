@@ -231,7 +231,26 @@ namespace VTFLib
 			\see tagSVTFCreateOptions
 		*/
 		vlBool Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt uiFaces, vlUInt vlSlices, vlByte **lpImageDataRGBA8888, const SVTFCreateOptions &VTFCreateOptions);
-		
+
+		//! Create a new VTF multi-frame or cubemap image from existing data in a given format.
+		/*!
+			Creates a new multi-frame or cubemap VTF image using image data already stored
+			in memory in either RGBA8888 or RGBA32323232F format.
+
+			\param uiWidth is the width in pixels of the main VTF image.
+			\param uiHeight is the height in pixels of the main VTF image.
+			\param uiFrames is the number of frames in the VTF image.
+			\param uiFaces is the number of faces in the VTF image.
+			\param vlSlices is the number of z slices in the VTF image.
+			\param lpImageData is an array of pointers to the image data for each frame/face.
+			\param VTFCreateOptions contains the options for image creation.
+			\param SourceFormat is the format of the source data; IMAGE_FORMAT_RGBA8888 or IMAGE_FORMAT_RGBA32323232F.
+			\return true on successful creation, otherwise false.
+			\note Animated and static textures have 1 face. Cubemaps have 6, one for each side of the cube.
+			\see tagSVTFCreateOptions
+		*/
+		vlBool Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt uiFaces, vlUInt vlSlices, vlByte **lpImageData, const SVTFCreateOptions &VTFCreateOptions, VTFImageFormat SourceFormat);
+
 		//! Destroys the current VTF image by setting the header, thumbnail and image data to zero.
 		vlVoid Destroy();
 
@@ -739,6 +758,13 @@ namespace VTFLib
 		*/
 		static vlBool Convert(vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, vlUInt uiHeight, VTFImageFormat SourceFormat, VTFImageFormat DestFormat);
 
+		//! Check if an image format stores 32 bit floating point channels.
+		/*!
+			\param Format is the image format to check.
+			\return true if the format stores 32 bit floating point channels.
+		*/
+		static vlBool IsFloatFormat(VTFImageFormat Format);
+
 		//! Re-sizes an image.
 		/*!
 			Re-sizes an image in RGBA8888 format to the given dimensions using the specified filters.
@@ -754,6 +780,21 @@ namespace VTFLib
 			\return true on sucessful re-size, otherwise false.
 		*/
 		static vlBool Resize(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter, vlBool bSRGB);
+
+		//! Re-sizes a 32 bit float image.
+		/*!
+			Re-sizes an image in RGBA32323232F format to the given dimensions using the specified filters.
+
+			\param lpSourceRGBA32F is a pointer to the source image data in RGBA32323232F format.
+			\param lpDestRGBA32F is a pointer to the buffer for the re-sized data.
+			\param uiSourceWidth is the width of the source image in pixels.
+			\param uiSourceHeight is the height of the source image in pixels.
+			\param uiDestWidth is the width of the destination image in pixels.
+			\param uiDestHeight is the height of the destination image in pixels.
+			\param ResizeFilter is the image reduction filter to use.
+			\return true on sucessful re-size, otherwise false.
+		*/
+		static vlBool ResizeRGBA32F(vlSingle *lpSourceRGBA32F, vlSingle *lpDestRGBA32F, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter);
 
 		//! Converts an image's alpha channel into a signed distance field.
 		/*!
@@ -783,7 +824,7 @@ namespace VTFLib
 
 		//! Correct and images gamma.
 		/*!
-			Applies gamma correction to an image.
+			Applies gamma correction to an image in RGBA8888 format.
 
 			\param lpImageDataRGBA8888 is a pointer to the image data in RGBA8888 format.
 			\param uiWidth is the width of the source image in pixels.
@@ -792,7 +833,18 @@ namespace VTFLib
 		*/
 		static vlVoid CorrectImageGamma(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight, vlSingle sGammaCorrection);
 
-		//! Computes the reflectivity for an image.
+		//! Correct a 32 bit float image's gamma.
+		/*!
+			Applies gamma correction to an image in RGBA32323232F format.
+
+			\param lpImageDataRGBA32F is a pointer to the image data in RGBA32323232F format.
+			\param uiWidth is the width of the source image in pixels.
+			\param uiHeight is the height of the source image in pixels.
+			\param sGammaCorrection is the amount of gamma correction to apply.
+		*/
+		static vlVoid CorrectImageGammaRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight, vlSingle sGammaCorrection);
+
+		//! Computes the reflectivity for an image in RGBA8888 format.
 		/*!
 			Calculates and sets the reflectivity vector values for the VTF image based on the
 			colour averages of each pixel.
@@ -806,6 +858,17 @@ namespace VTFLib
 			\see SetReflectivity()
 		*/
 		static vlVoid ComputeImageReflectivity(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight, vlSingle &sX, vlSingle &sY, vlSingle &sZ);
+
+		//! Computes the reflectivity for a 32 bit float image in RGBA32323232F format.
+		/*!
+			\param lpImageDataRGBA32F is a pointer to the image data in RGBA32323232F format.
+			\param uiWidth is the width of the source image in pixels.
+			\param uiHeight is the height of the source image in pixels.
+			\param sX receives the reflectivity of the red channel.
+			\param sY receives the reflectivity of the green channel.
+			\param sZ receives the reflectivity of the blue channel.
+		*/
+		static vlVoid ComputeImageReflectivityRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight, vlSingle &sX, vlSingle &sY, vlSingle &sZ);
 
 		static vlVoid FlipImage(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight);		//!< Flips an image vertically along its X-axis.
 		static vlVoid MirrorImage(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight);	//!< Flips an image horizontally along its Y-axis.

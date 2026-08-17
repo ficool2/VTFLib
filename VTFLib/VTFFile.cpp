@@ -485,6 +485,19 @@ static const char *GetCMPErrorString( CMP_ERROR error )
 //
 vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt uiFaces, vlUInt uiSlices, vlByte **lpImageDataRGBA8888, const SVTFCreateOptions &VTFCreateOptions)
 {
+	return this->Create(uiWidth, uiHeight, uiFrames, uiFaces, uiSlices, lpImageDataRGBA8888, VTFCreateOptions, IMAGE_FORMAT_RGBA8888);
+}
+
+vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt uiFaces, vlUInt uiSlices, vlByte **lpImageDataRGBA8888, const SVTFCreateOptions &VTFCreateOptions, VTFImageFormat SourceFormat)
+{
+	if(SourceFormat != IMAGE_FORMAT_RGBA8888 && SourceFormat != IMAGE_FORMAT_RGBA32323232F)
+	{
+		LastError.Set("Source image data must be in RGBA8888 or RGBA32323232F format.");
+		return vlFalse;
+	}
+
+	const vlBool bFloatSource = SourceFormat == IMAGE_FORMAT_RGBA32323232F;
+
 	vlUInt uiCount = 0;
 	if(uiFrames > uiCount)
 		uiCount = uiFrames;
@@ -565,9 +578,33 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 
 				for(vlUInt i = 0; i < uiCount; i++)
 				{
-					lpNewImageDataRGBA8888[i] = new vlByte[this->ComputeImageSize(uiNewWidth, uiNewHeight, 1, IMAGE_FORMAT_RGBA8888)];
+					lpNewImageDataRGBA8888[i] = new vlByte[this->ComputeImageSize(uiNewWidth, uiNewHeight, 1, SourceFormat)];
 
-					if(!this->Resize(lpImageDataRGBA8888[i], lpNewImageDataRGBA8888[i], uiWidth, uiHeight, uiNewWidth, uiNewHeight, VTFCreateOptions.ResizeFilter, VTFCreateOptions.bSRGB))
+					vlBool bResized;
+					if(bResized)
+					{
+						bResized = this->ResizeRGBA32F(
+							(vlSingle *)lpImageDataRGBA8888[i],
+							(vlSingle *)lpNewImageDataRGBA8888[i],
+							uiWidth,
+							uiHeight, 
+							uiNewWidth,
+							uiNewHeight, 
+							VTFCreateOptions.ResizeFilter);
+					}
+					else
+					{
+						bResized = this->Resize(lpImageDataRGBA8888[i], 
+							lpNewImageDataRGBA8888[i], 
+							uiWidth, 
+							uiHeight,
+							uiNewWidth,
+							uiNewHeight,
+							VTFCreateOptions.ResizeFilter, 
+							VTFCreateOptions.bSRGB);
+					}
+
+					if(!bResized)
 					{
 						throw 0;
 					}
@@ -609,7 +646,14 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 				{
 					for(vlUInt k = 0; k < uiSlices; k++)
 					{
-						this->CorrectImageGamma(lpImageDataRGBA8888[i + j + k], this->Header->Width, this->Header->Height, VTFCreateOptions.sGammaCorrection);
+						if(bFloatSource)
+						{
+							this->CorrectImageGammaRGBA32F((vlSingle *)lpImageDataRGBA8888[i + j + k], this->Header->Width, this->Header->Height, VTFCreateOptions.sGammaCorrection);
+						}
+						else
+						{
+							this->CorrectImageGamma(lpImageDataRGBA8888[i + j + k], this->Header->Width, this->Header->Height, VTFCreateOptions.sGammaCorrection);
+						}
 					}
 				}
 			}
@@ -618,7 +662,7 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 		// Generate mipmaps off source image.
 		if(VTFCreateOptions.bMipmaps && this->Header->MipCount != 1)
 		{
-			auto temp = std::vector<vlByte>(this->Header->Width * this->Header->Height * 4);
+			auto temp = std::vector<vlByte>(this->ComputeImageSize(this->Header->Width, this->Header->Height, 1, SourceFormat));
 
 			for(vlUInt i = 0; i < uiFrames; i++)
 			{
@@ -628,7 +672,7 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 					{
 						vlByte* pSource = lpImageDataRGBA8888[i + j + k];
 
-						if(!this->ConvertFromRGBA8888(pSource, this->GetData(i, j, k, 0), this->Header->Width, this->Header->Height, this->Header->ImageFormat))
+						if(!this->Convert(pSource, this->GetData(i, j, k, 0), this->Header->Width, this->Header->Height, SourceFormat, this->Header->ImageFormat))
 						{
 							throw 0;
 						}
@@ -638,16 +682,30 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 							vlUShort usWidth  = max(1u, this->Header->Width  >> m);
 							vlUShort usHeight = max(1u, this->Header->Height >> m);
 
-							if (!CVTFFile::Resize(
-								pSource, temp.data(),
-								this->Header->Width, this->Header->Height,
-								usWidth, usHeight,
-								VTFCreateOptions.MipmapFilter, VTFCreateOptions.bSRGB))
+							vlBool bResized;
+							if(bFloatSource)
+							{
+								bResized = CVTFFile::ResizeRGBA32F(
+									(vlSingle *)pSource, (vlSingle *)temp.data(),
+									this->Header->Width, this->Header->Height,
+									usWidth, usHeight,
+									VTFCreateOptions.MipmapFilter);
+							}
+							else
+							{
+								bResized = CVTFFile::Resize(
+									pSource, temp.data(),
+									this->Header->Width, this->Header->Height,
+									usWidth, usHeight,
+									VTFCreateOptions.MipmapFilter, VTFCreateOptions.bSRGB);
+							}
+
+							if(!bResized)
 							{
 								throw 0;
 							}
 
-							if (!this->ConvertFromRGBA8888(temp.data(), this->GetData(i, j, k, m), usWidth, usHeight, this->Header->ImageFormat))
+							if (!this->Convert(temp.data(), this->GetData(i, j, k, m), usWidth, usHeight, SourceFormat, this->Header->ImageFormat))
 							{
 								throw 0;
 							}
@@ -664,7 +722,7 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 				{
 					for(vlUInt k = 0; k < uiSlices; k++)
 					{
-						if(!this->ConvertFromRGBA8888(lpImageDataRGBA8888[i + j + k], this->GetData(i, j, k, 0), this->Header->Width, this->Header->Height, this->Header->ImageFormat))
+						if(!this->Convert(lpImageDataRGBA8888[i + j + k], this->GetData(i, j, k, 0), this->Header->Width, this->Header->Height, SourceFormat, this->Header->ImageFormat))
 						{
 							throw 0;
 						}
@@ -703,7 +761,15 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 					for(vlUInt k = 0; k < uiSlices; k++)
 					{
 						vlSingle sX, sY, sZ;
-						this->ComputeImageReflectivity(lpImageDataRGBA8888[i + j + k], uiWidth, uiHeight, sX, sY, sZ);
+
+						if(bFloatSource)
+						{
+							this->ComputeImageReflectivityRGBA32F((vlSingle *)lpImageDataRGBA8888[i + j + k], uiWidth, uiHeight, sX, sY, sZ);
+						}
+						else
+						{
+							this->ComputeImageReflectivity(lpImageDataRGBA8888[i + j + k], uiWidth, uiHeight, sX, sY, sZ);
+						}
 
 						this->Header->Reflectivity[0] += sX;
 						this->Header->Reflectivity[1] += sY;
@@ -3788,9 +3854,9 @@ static SVTFImageConvertInfo VTFImageConvertInfo[] =
 	{    64,  8, 16, 16, 16, 16,	 0,	 1,	 2,	 3, vlFalse,  vlTrue,	ToFP16,	FromFP16,	IMAGE_FORMAT_RGBA16161616F},
 	{	 64,  8, 16, 16, 16, 16,	 0,	 1,	 2,	 3, vlFalse,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_RGBA16161616},
 	{ 	 32,  4,  8,  8,  8,  8,	 0,	 1,	 2,	 3, vlFalse,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_UVLX8888},
-	{ 	 32,  4, 32,  0,  0,  0,	 0,	-1,	-1,	-1, vlFalse, vlFalse,	NULL,	NULL,		IMAGE_FORMAT_R32F},
-	{ 	 96, 12, 32, 32, 32,  0,	 0,	 1,	 2,	-1, vlFalse, vlFalse,	NULL,	NULL,		IMAGE_FORMAT_RGB323232F},
-	{	128, 16, 32, 32, 32, 32,	 0,	 1,	 2,	 3, vlFalse, vlFalse,	NULL,	NULL,		IMAGE_FORMAT_RGBA32323232F},
+	{ 	 32,  4, 32,  0,  0,  0,	 0,	-1,	-1,	-1, vlFalse,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_R32F},
+	{ 	 96, 12, 32, 32, 32,  0,	 0,	 1,	 2,	-1, vlFalse,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_RGB323232F},
+	{	128, 16, 32, 32, 32, 32,	 0,	 1,	 2,	 3, vlFalse,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_RGBA32323232F},
 	{    16,  2, 16,  0,  0,  0,	 0,	-1,	-1,	-1, vlFalse,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_NV_DST16},
 	{	 24,  3, 24,  0,  0,  0,	 0,	-1,	-1,	-1, vlFalse,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_NV_DST24},
 	{	 32,  4,  0,  0,  0,  0,	-1,	-1,	-1,	-1, vlFalse, vlFalse,	NULL,	NULL,		IMAGE_FORMAT_NV_INTZ},
@@ -4074,6 +4140,206 @@ vlBool ConvertTemplated(vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, vlUInt
 	return vlTrue;
 }
 
+// Based on https://www.corsix.org/content/converting-fp32-to-fp16
+static inline vlUInt16 FP32ToFP16(vlSingle sValue)
+{
+	vlUInt32 uiBits;
+	std::memcpy(&uiBits, &sValue, sizeof(uiBits));
+
+	vlUInt32 uiSign = (uiBits >> 16) & 0x8000;
+	vlInt iExponent = (vlInt)((uiBits >> 23) & 0xff) - 127;
+	vlUInt32 uiMantissa = uiBits & 0x007fffff;
+
+	if(iExponent == 128)
+	{
+		// Inf or NaN
+		return (vlUInt16)(uiSign | (uiMantissa != 0 ? 0 : 0x7bff));
+	}
+
+	if(iExponent > 15)
+	{
+		// Too large
+		return (vlUInt16)(uiSign | 0x7bff);
+	}
+
+	if(iExponent < -14)
+	{
+		// Denormalized or too small
+		vlInt iShift = -14 - iExponent;
+
+		if(iShift > 10)
+		{
+			return (vlUInt16)uiSign;
+		}
+
+		uiMantissa = (uiMantissa | 0x00800000) >> (iShift + 13);
+
+		return (vlUInt16)(uiSign | uiMantissa);
+	}
+
+	return (vlUInt16)(uiSign | (vlUInt32)((iExponent + 15) << 10) | (uiMantissa >> 13));
+}
+
+//
+// ConvertToRGBA32F()
+// Converts image data of any format into RGBA 32 bit float data.
+//
+static vlBool ConvertToRGBA32F(vlByte *lpSource, vlSingle *lpDest, vlUInt uiWidth, vlUInt uiHeight, VTFImageFormat SourceFormat)
+{
+	const vlUInt uiPixels = uiWidth * uiHeight;
+
+	switch(SourceFormat)
+	{
+	case IMAGE_FORMAT_RGBA32323232F:
+		memcpy(lpDest, lpSource, uiPixels * 4 * sizeof(vlSingle));
+		return vlTrue;
+	case IMAGE_FORMAT_RGB323232F:
+	{
+		const vlSingle *lpSourceF = (const vlSingle *)lpSource;
+
+		for(vlUInt i = 0; i < uiPixels; i++)
+		{
+			lpDest[i * 4 + 0] = lpSourceF[i * 3 + 0];
+			lpDest[i * 4 + 1] = lpSourceF[i * 3 + 1];
+			lpDest[i * 4 + 2] = lpSourceF[i * 3 + 2];
+			lpDest[i * 4 + 3] = 1.0f;
+		}
+
+		return vlTrue;
+	}
+	case IMAGE_FORMAT_R32F:
+	{
+		const vlSingle *lpSourceF = (const vlSingle *)lpSource;
+
+		for(vlUInt i = 0; i < uiPixels; i++)
+		{
+			lpDest[i * 4 + 0] = lpSourceF[i];
+			lpDest[i * 4 + 1] = 0.0f;
+			lpDest[i * 4 + 2] = 0.0f;
+			lpDest[i * 4 + 3] = 1.0f;
+		}
+
+		return vlTrue;
+	}
+	case IMAGE_FORMAT_RGBA16161616F:
+	{
+		const vlUInt16 *lpSourceH = (const vlUInt16 *)lpSource;
+
+		for(vlUInt i = 0; i < uiPixels * 4; i++)
+		{
+			lpDest[i] = FP16ToFP32(lpSourceH[i]);
+		}
+
+		return vlTrue;
+	}
+	default:
+	{
+		std::vector<vlByte> Temp(uiPixels * 4);
+
+		if(!CVTFFile::Convert(lpSource, Temp.data(), uiWidth, uiHeight, SourceFormat, IMAGE_FORMAT_RGBA8888))
+		{
+			return vlFalse;
+		}
+
+		for(vlUInt i = 0; i < uiPixels * 4; i++)
+		{
+			lpDest[i] = (vlSingle)Temp[i] / 255.0f;
+		}
+
+		return vlTrue;
+	}
+	}
+}
+
+//
+// ConvertFromRGBA32F()
+// Converts RGBA 32 bit float data into any format.
+//
+static vlBool ConvertFromRGBA32F(const vlSingle *lpSource, vlByte *lpDest, vlUInt uiWidth, vlUInt uiHeight, VTFImageFormat DestFormat)
+{
+	const vlUInt uiPixels = uiWidth * uiHeight;
+
+	switch(DestFormat)
+	{
+	case IMAGE_FORMAT_RGBA32323232F:
+		memcpy(lpDest, lpSource, uiPixels * 4 * sizeof(vlSingle));
+		return vlTrue;
+	case IMAGE_FORMAT_RGB323232F:
+	{
+		vlSingle *lpDestF = (vlSingle *)lpDest;
+
+		for(vlUInt i = 0; i < uiPixels; i++)
+		{
+			lpDestF[i * 3 + 0] = lpSource[i * 4 + 0];
+			lpDestF[i * 3 + 1] = lpSource[i * 4 + 1];
+			lpDestF[i * 3 + 2] = lpSource[i * 4 + 2];
+		}
+
+		return vlTrue;
+	}
+	case IMAGE_FORMAT_R32F:
+	{
+		vlSingle *lpDestF = (vlSingle *)lpDest;
+
+		for(vlUInt i = 0; i < uiPixels; i++)
+		{
+			lpDestF[i] = lpSource[i * 4 + 0];
+		}
+
+		return vlTrue;
+	}
+	case IMAGE_FORMAT_RGBA16161616F:
+	{
+		vlUInt16 *lpDestH = (vlUInt16 *)lpDest;
+
+		for(vlUInt i = 0; i < uiPixels * 4; i++)
+		{
+			lpDestH[i] = FP32ToFP16(lpSource[i]);
+		}
+
+		return vlTrue;
+	}
+	default:
+	{
+		// Tone map down to RGBA8888
+		std::vector<vlByte> Temp(uiPixels * 4);
+
+		for(vlUInt i = 0; i < uiPixels; i++)
+		{
+			for(vlUInt j = 0; j < 4; j++)
+			{
+				vlSingle sValue = lpSource[i * 4 + j];
+
+				// Ignore alpha channel
+				if(j != 3)
+				{
+					sValue = Reinhard(sValue * sFP16HDRExposure);
+				}
+
+				sValue = sValue * 255.0f + 0.5f;
+				sValue = min(max(sValue, 0.0f), 255.0f);
+
+				Temp[i * 4 + j] = (vlByte)sValue;
+			}
+		}
+
+		return CVTFFile::Convert(Temp.data(), lpDest, uiWidth, uiHeight, IMAGE_FORMAT_RGBA8888, DestFormat);
+	}
+	}
+}
+
+vlBool CVTFFile::IsFloatFormat(VTFImageFormat Format)
+{
+	return Format == IMAGE_FORMAT_R32F
+		|| Format == IMAGE_FORMAT_RGB323232F
+		|| Format == IMAGE_FORMAT_RGBA32323232F;
+}
+
+static vlBool IsFloatConvertFormat(VTFImageFormat Format)
+{
+	return CVTFFile::IsFloatFormat(Format) || Format == IMAGE_FORMAT_RGBA16161616F;
+}
+
 vlBool CVTFFile::Convert(vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, vlUInt uiHeight, VTFImageFormat SourceFormat, VTFImageFormat DestFormat)
 {
 	assert(lpSource != 0);
@@ -4178,6 +4444,17 @@ vlBool CVTFFile::Convert(vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, vlUIn
 		}
 
 		return bResult;
+	}
+	else if(IsFloatConvertFormat(SourceFormat) || IsFloatConvertFormat(DestFormat))
+	{
+		// can only work with these as 32 bit
+		std::vector<vlSingle> Temp((size_t)uiWidth * (size_t)uiHeight * 4);
+		if(!ConvertToRGBA32F(lpSource, Temp.data(), uiWidth, uiHeight, SourceFormat))
+		{
+			return vlFalse;
+		}
+
+		return ConvertFromRGBA32F(Temp.data(), lpDest, uiWidth, uiHeight, DestFormat);
 	}
 	else
 	{
@@ -4405,6 +4682,26 @@ vlBool CVTFFile::Resize(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt
 }
 
 //
+// ResizeRGBA32F()
+// Re-size 32 bit float image data.
+//
+vlBool CVTFFile::ResizeRGBA32F(vlSingle *lpSource, vlSingle *lpDest, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter)
+{
+	assert(ResizeFilter >= 0 && ResizeFilter < MIPMAP_FILTER_COUNT);
+
+	if(!stbir_resize_float_generic(
+		lpSource, (int)uiSourceWidth, (int)uiSourceHeight, 0,
+		lpDest, (int)uiDestWidth, (int)uiDestHeight, 0,
+		4, 3, 0, STBIR_EDGE_CLAMP, STBIR_FILTER_BOX, STBIR_COLORSPACE_LINEAR, NULL))
+	{
+		LastError.Set("Error resizing image.");
+		return vlFalse;
+	}
+
+	return vlTrue;
+}
+
+//
 // CorrectImageGamma()
 // Do gamma correction on the image data.
 //
@@ -4433,6 +4730,34 @@ vlVoid CVTFFile::CorrectImageGamma(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, 
 		lpImageDataRGBA8888[0] = bTable[lpImageDataRGBA8888[0]];
 		lpImageDataRGBA8888[1] = bTable[lpImageDataRGBA8888[1]];
 		lpImageDataRGBA8888[2] = bTable[lpImageDataRGBA8888[2]];
+	}
+}
+
+//
+// CorrectImageGammaRGBA32F()
+// Do gamma correction on 32 bit float image data.
+//
+vlVoid CVTFFile::CorrectImageGammaRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight, vlSingle sGammaCorrection)
+{
+	if(sGammaCorrection == 1.0f)
+	{
+		return;
+	}
+
+	sGammaCorrection = 1.0f / sGammaCorrection;
+
+	vlSingle *lpImageDataRGBA32FEnd = lpImageDataRGBA32F + uiWidth * uiHeight * 4;
+
+	// Do gamma correction on RGB channels.
+	for(; lpImageDataRGBA32F < lpImageDataRGBA32FEnd; lpImageDataRGBA32F += 4)
+	{
+		for(vlUInt i = 0; i < 3; i++)
+		{
+			if(lpImageDataRGBA32F[i] > 0.0f)
+			{
+				lpImageDataRGBA32F[i] = (vlSingle)pow(lpImageDataRGBA32F[i], sGammaCorrection);
+			}
+		}
 	}
 }
 
@@ -4491,6 +4816,43 @@ vlVoid CVTFFile::ComputeImageReflectivity(vlByte *lpImageDataRGBA8888, vlUInt ui
 			sTempX += sTable[lpImageDataRGBA8888[uiIndex + 0]];
 			sTempY += sTable[lpImageDataRGBA8888[uiIndex + 1]];
 			sTempZ += sTable[lpImageDataRGBA8888[uiIndex + 2]];
+		}
+
+		sInverse = 1.0f / (vlSingle)uiWidth;
+
+		sX += sTempX * sInverse;
+		sY += sTempY * sInverse;
+		sZ += sTempZ * sInverse;
+	}
+
+	sInverse = 1.0f / (vlSingle)uiHeight;
+
+	sX *= sInverse;
+	sY *= sInverse;
+	sZ *= sInverse;
+}
+
+//
+// ComputeImageReflectivityRGBA32F()
+// Compute the reflectivity value of 32 bit float image data.
+//
+vlVoid CVTFFile::ComputeImageReflectivityRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight, vlSingle &sX, vlSingle &sY, vlSingle &sZ)
+{
+	sX = sY = sZ = 0.0f;
+
+	vlSingle sTempX, sTempY, sTempZ, sInverse;
+
+	for(vlUInt j = 0; j < uiHeight; j++)
+	{
+		sTempX = sTempY = sTempZ = 0.0f;
+
+		for(vlUInt i = 0; i < uiWidth; i++)
+		{
+			vlUInt uiIndex = (i + j * uiWidth) * 4;
+
+			sTempX += min(max(lpImageDataRGBA32F[uiIndex + 0], 0.0f), 1.0f);
+			sTempY += min(max(lpImageDataRGBA32F[uiIndex + 1], 0.0f), 1.0f);
+			sTempZ += min(max(lpImageDataRGBA32F[uiIndex + 2], 0.0f), 1.0f);
 		}
 
 		sInverse = 1.0f / (vlSingle)uiWidth;
