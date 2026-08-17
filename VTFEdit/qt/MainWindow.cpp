@@ -22,6 +22,7 @@
 #include "AboutDialog.h"
 #include "BatchConvertDialog.h"
 #include "FileDialogHistory.h"
+#include "HotspotDialog.h"
 #include "ImageView.h"
 #include "SheetDialog.h"
 #include "VmtCreateDialog.h"
@@ -140,6 +141,12 @@ namespace VTFEdit
 		QString lastErrorString()
 		{
 			return QString::fromLatin1(vlGetLastError());
+		}
+
+		bool IsKeyValuesFileName(const QString &sFileName)
+		{
+			return sFileName.endsWith(QLatin1String(".vmt"), Qt::CaseInsensitive)
+				|| sFileName.endsWith(QLatin1String(".rect"), Qt::CaseInsensitive);
 		}
 
 		QLabel *addInfoRow(QFormLayout *pForm, const QString &sLabel)
@@ -335,6 +342,18 @@ namespace VTFEdit
 		m_pMipmapFullSizeAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_M));
 		connect(m_pMipmapFullSizeAction, &QAction::triggered, this, &MainWindow::onViewOptionChanged);
 
+		m_pEditSheetAction = new QAction(tr("&Edit..."), this);
+		connect(m_pEditSheetAction, &QAction::triggered, this, &MainWindow::onEditSheet);
+
+		m_pRemoveSheetAction = new QAction(tr("&Remove"), this);
+		connect(m_pRemoveSheetAction, &QAction::triggered, this, &MainWindow::onRemoveSheet);
+
+		m_pEditHotspotAction = new QAction(tr("&Edit..."), this);
+		connect(m_pEditHotspotAction, &QAction::triggered, this, &MainWindow::onEditHotspot);
+
+		m_pRemoveHotspotAction = new QAction(tr("&Remove"), this);
+		connect(m_pRemoveHotspotAction, &QAction::triggered, this, &MainWindow::onRemoveHotspot);
+
 		m_pCreateVmtFileAction = new QAction(tr("Create &VMT File"), this);
 		connect(m_pCreateVmtFileAction, &QAction::triggered, this, &MainWindow::onCreateVmtFile);
 
@@ -396,6 +415,18 @@ namespace VTFEdit
 		QMenu *pToolsMenu = menuBar()->addMenu(tr("&Tools"));
 		pToolsMenu->addAction(m_pCreateVmtFileAction);
 		pToolsMenu->addAction(m_pConvertFolderAction);
+
+		m_pTextureMenu = menuBar()->addMenu(tr("&Texture"));
+
+		QMenu* pSheetMenu = m_pTextureMenu->addMenu(tr("Sprite &Sheet"));
+		pSheetMenu->setToolTipsVisible(true);
+		pSheetMenu->addAction(m_pEditSheetAction);
+		pSheetMenu->addAction(m_pRemoveSheetAction);
+
+		QMenu* pHotspotMenu = m_pTextureMenu->addMenu(tr("&Hotspot Rectangles"));
+		pHotspotMenu->setToolTipsVisible(true);
+		pHotspotMenu->addAction(m_pEditHotspotAction);
+		pHotspotMenu->addAction(m_pRemoveHotspotAction);
 
 		QMenu *pOptionsMenu = menuBar()->addMenu(tr("&Options"));
 		pOptionsMenu->addAction(m_pAutoCreateVmtFileAction);
@@ -690,20 +721,8 @@ namespace VTFEdit
 		m_pResources->setColumnCount(1);
 		pResourcesLayout->addWidget(m_pResources);
 
-		QGroupBox *pSheet = new QGroupBox(tr("Sprite Sheet:"), pTab);
-		QHBoxLayout *pSheetLayout = new QHBoxLayout(pSheet);
-
-		m_pEditSheetButton = new QPushButton(tr("&Create..."), pSheet);
-		connect(m_pEditSheetButton, &QPushButton::clicked, this, &MainWindow::onEditSheet);
-		pSheetLayout->addWidget(m_pEditSheetButton);
-
-		m_pRemoveSheetButton = new QPushButton(tr("&Remove"), pSheet);
-		connect(m_pRemoveSheetButton, &QPushButton::clicked, this, &MainWindow::onRemoveSheet);
-		pSheetLayout->addWidget(m_pRemoveSheetButton);
-
 		pLayout->addWidget(pResourceInfo);
 		pLayout->addWidget(pResources, 1);
-		pLayout->addWidget(pSheet);
 
 		return pTab;
 	}
@@ -1202,6 +1221,7 @@ namespace VTFEdit
 		}
 
 		updateSheetActions();
+		updateHotspotActions();
 	}
 
 	void MainWindow::updateSheetActions()
@@ -1211,11 +1231,11 @@ namespace VTFEdit
 		vlUInt uiSize = 0;
 		const bool bHasSheet = bSupported && m_pVTFFile->GetResourceData(VTF_RSRC_SHEET, uiSize) != nullptr;
 
-		m_pEditSheetButton->setEnabled(bSupported);
-		m_pEditSheetButton->setText(bHasSheet ? tr("&Edit...") : tr("&Create..."));
-		m_pRemoveSheetButton->setEnabled(bHasSheet);
+		m_pEditSheetAction->setEnabled(bSupported);
+		m_pEditSheetAction->setText(bHasSheet ? tr("&Edit...") : tr("&Create..."));
+		m_pRemoveSheetAction->setEnabled(bHasSheet);
 
-		m_pEditSheetButton->setToolTip(bSupported
+		m_pEditSheetAction->setToolTip(bSupported
 			? tr("Edit the sprite sheet (.sht) resource attached to this texture.")
 			: tr("Sprite sheets require a version 7.3 or newer texture."));
 	}
@@ -1292,6 +1312,130 @@ namespace VTFEdit
 
 		updateResourceList();
 		onVtfPropertyChanged();
+	}
+
+	//
+	// Hotspot rectangles
+	//
+
+	QString MainWindow::hotspotFilePath() const
+	{
+		if(m_pVTFFile == nullptr)
+		{
+			return QString();
+		}
+
+		return RectFile::pathForTexture(m_sFileName);
+	}
+
+	void MainWindow::updateHotspotActions()
+	{
+		const QString sPath = hotspotFilePath();
+		const bool bHasFile = !sPath.isEmpty() && QFileInfo::exists(sPath);
+
+		m_pEditHotspotAction->setEnabled(!sPath.isEmpty());
+		m_pEditHotspotAction->setText(bHasFile ? tr("&Edit...") : tr("&Create..."));
+		m_pRemoveHotspotAction->setEnabled(bHasFile);
+
+		m_pEditHotspotAction->setToolTip(sPath.isEmpty()
+			? tr("Save the texture before creating a hotspot .rect file for it.")
+			: tr("Edit the hotspot rectangles in %1.").arg(QDir::toNativeSeparators(sPath)));
+	}
+
+	void MainWindow::onEditHotspot()
+	{
+		const QString sPath = hotspotFilePath();
+		if(sPath.isEmpty())
+		{
+			return;
+		}
+
+		RectFile Rectangles;
+
+		QFile File(sPath);
+		if(File.exists())
+		{
+			if(!File.open(QIODevice::ReadOnly))
+			{
+				QMessageBox::critical(this, QApplication::applicationName(),
+					tr("Error opening hotspot file:\n\n%1").arg(File.errorString()));
+				return;
+			}
+
+			const QByteArray Data = File.readAll();
+			File.close();
+
+			QString sError;
+			if(!Rectangles.load(Data, &sError))
+			{
+				if(QMessageBox::question(this, QApplication::applicationName(),
+					tr("The hotspot file could not be read:\n\n%1\n\nReplace it?").arg(sError),
+					QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes)
+				{
+					return;
+				}
+
+				Rectangles = RectFile();
+			}
+		}
+
+		HotspotDialog Dialog(Rectangles, m_pImageView->image(),
+			static_cast<int>(m_pVTFFile->GetWidth()), static_cast<int>(m_pVTFFile->GetHeight()), this);
+
+		if(Dialog.exec() != QDialog::Accepted)
+		{
+			return;
+		}
+
+		const RectFile &NewRectangles = Dialog.rectangles();
+
+		if(NewRectangles.isEmpty())
+		{
+			if(File.exists() && !File.remove())
+			{
+				QMessageBox::critical(this, QApplication::applicationName(),
+					tr("Error removing hotspot file:\n\n%1").arg(File.errorString()));
+			}
+		}
+		else
+		{
+			if(!File.open(QIODevice::WriteOnly | QIODevice::Truncate))
+			{
+				QMessageBox::critical(this, QApplication::applicationName(),
+					tr("Error saving hotspot file:\n\n%1").arg(File.errorString()));
+				return;
+			}
+
+			File.write(NewRectangles.save());
+			File.close();
+		}
+
+		updateHotspotActions();
+	}
+
+	void MainWindow::onRemoveHotspot()
+	{
+		const QString sPath = hotspotFilePath();
+		if(sPath.isEmpty() || !QFileInfo::exists(sPath))
+		{
+			return;
+		}
+
+		if(QMessageBox::question(this, QApplication::applicationName(),
+			tr("Delete the hotspot file %1?").arg(QDir::toNativeSeparators(sPath)),
+			QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes)
+		{
+			return;
+		}
+
+		QFile File(sPath);
+		if(!File.remove())
+		{
+			QMessageBox::critical(this, QApplication::applicationName(),
+				tr("Error removing hotspot file:\n\n%1").arg(File.errorString()));
+		}
+
+		updateHotspotActions();
 	}
 
 	bool MainWindow::getVtfFile()
@@ -1761,6 +1905,10 @@ namespace VTFEdit
 
 		m_pNextTabAction->setEnabled(m_Documents.size() > 1);
 		m_pPreviousTabAction->setEnabled(m_Documents.size() > 1);
+
+		m_pTextureMenu->setEnabled(bVtf);
+		updateSheetActions();
+		updateHotspotActions();
 	}
 
 	//
@@ -1822,7 +1970,7 @@ namespace VTFEdit
 				FileDialogHistory::remember(FileDialogHistory::s_sFileDirectory, sFileName);
 			}
 		}
-		else if(sFileName.endsWith(QLatin1String(".vmt"), Qt::CaseInsensitive))
+		else if(IsKeyValuesFileName(sFileName))
 		{
 			QFile File(sFileName);
 			if(!File.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -1923,6 +2071,8 @@ namespace VTFEdit
 			m_sFileName = sFileName;
 			m_pStatusFileName->setText(sFileName);
 			updateWindowTitle();
+
+			updateHotspotActions();
 		}
 
 		addRecentFile(sFileName);
@@ -1970,8 +2120,11 @@ namespace VTFEdit
 		}
 		else if(pDocument->pVMTFile != nullptr)
 		{
-			sFileName = QFileDialog::getSaveFileName(this, tr("Save VMT File"),
-				sStartPath, tr("VMT Files (*.vmt)"));
+			const bool bRect = sDefault.endsWith(QLatin1String(".rect"), Qt::CaseInsensitive);
+
+			sFileName = QFileDialog::getSaveFileName(this,
+				bRect ? tr("Save Hotspot File") : tr("Save VMT File"),
+				sStartPath, bRect ? tr("Hotspot Files (*.rect)") : tr("VMT Files (*.vmt)"));
 		}
 
 		if(sFileName.isEmpty())
@@ -2291,7 +2444,8 @@ namespace VTFEdit
 	{
 		const QString sFileName = QFileDialog::getOpenFileName(this, tr("Open"),
 			FileDialogHistory::s_sFileDirectory,
-			tr("Supported Files (*.vmt *.vtf);;VMT Files (*.vmt);;VTF Files (*.vtf);;All Files (*.*)"));
+			tr("Supported Files (*.vmt *.vtf *.rect);;VMT Files (*.vmt);;VTF Files (*.vtf);;"
+				"Hotspot Files (*.rect);;All Files (*.*)"));
 
 		if(!sFileName.isEmpty())
 		{
@@ -3564,13 +3718,13 @@ namespace VTFEdit
 		// TODO maybe handle the case of dropping both vtfs/vmts and other files together
 
 		if(sFiles.first().endsWith(QLatin1String(".vtf"), Qt::CaseInsensitive)
-			|| sFiles.first().endsWith(QLatin1String(".vmt"), Qt::CaseInsensitive))
+			|| IsKeyValuesFileName(sFiles.first()))
 		{
 			// each dropped material or texture gets its own tab
 			for(const QString &sFile : sFiles)
 			{
 				if(sFile.endsWith(QLatin1String(".vtf"), Qt::CaseInsensitive)
-					|| sFile.endsWith(QLatin1String(".vmt"), Qt::CaseInsensitive))
+					|| IsKeyValuesFileName(sFile))
 				{
 					open(sFile, false);
 				}

@@ -175,6 +175,9 @@ namespace VTFEdit
 		void onEditSheet();
 		void onRemoveSheet();
 
+		void onEditHotspot();
+		void onRemoveHotspot();
+
 		void onImageContextMenu(const QPoint &Position);
 		void onVmtContextMenu(const QPoint &Position);
 		void onImageMouseMoved(int iX, int iY);
@@ -230,6 +233,8 @@ namespace VTFEdit
 		void updateFileInfo();
 		void updateResourceList();
 		void updateSheetActions();
+		void updateHotspotActions();
+		QString hotspotFilePath() const;
 		void updateVmtErrorHighlight();
 		void applyVmtTabStopDistance();
 		void applyVmtEditorSettings();
@@ -312,6 +317,10 @@ namespace VTFEdit
 		QAction *m_pMaskAction;
 		QAction *m_pTileAction;
 		QAction *m_pMipmapFullSizeAction;
+		QAction *m_pEditSheetAction;
+		QAction *m_pRemoveSheetAction;
+		QAction *m_pEditHotspotAction;
+		QAction *m_pRemoveHotspotAction;
 		QAction *m_pCreateVmtFileAction;
 		QAction *m_pConvertFolderAction;
 		QAction *m_pAutoCreateVmtFileAction;
@@ -319,6 +328,7 @@ namespace VTFEdit
 		QAction *m_pVmtEditorOptionsAction;
 		QAction *m_pAboutAction;
 		QMenu *m_pRecentFilesMenu;
+		QMenu *m_pTextureMenu;
 
 		// Document tabs.
 		QTabBar *m_pTabBar;
@@ -376,8 +386,6 @@ namespace VTFEdit
 		// Resources tab controls.
 		QLabel *m_pResourceCount;
 		QTreeWidget *m_pResources;
-		QPushButton *m_pEditSheetButton;
-		QPushButton *m_pRemoveSheetButton;
 
 		// Status bar.
 		QLabel *m_pStatusFileName;
