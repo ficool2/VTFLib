@@ -32,6 +32,7 @@ class QLabel;
 class QPushButton;
 class QSpinBox;
 class QStackedWidget;
+class QTimer;
 class QTreeWidget;
 class QTreeWidgetItem;
 
@@ -46,6 +47,8 @@ namespace VTFEdit
 		void setFrame(const SheetFrame &Frame, bool bValid);
 		void clearFrame();
 
+		void setAnimating(bool bAnimating);
+
 	protected:
 		void paintEvent(QPaintEvent *pEvent) override;
 
@@ -53,6 +56,7 @@ namespace VTFEdit
 		QImage m_Image;
 		SheetFrame m_Frame;
 		bool m_bHasFrame;
+		bool m_bAnimating;
 	};
 
 	class SheetDialog : public QDialog
@@ -77,8 +81,16 @@ namespace VTFEdit
 		void onSequenceEdited();
 		void onFrameEdited();
 		void onLinkImagesToggled(bool bChecked);
+		void onPlayClicked();
+		void onPlaybackTimeout();
 
 	private:
+		void startPlayback();
+		void stopPlayback();
+		void showPlaybackFrame();
+		void schedulePlaybackFrame();
+		void updatePlaybackControls();
+
 		QWidget *createSequenceEditor();
 		QWidget *createFrameEditor();
 
@@ -103,6 +115,13 @@ namespace VTFEdit
 		QWidget *m_pSequenceEditor;
 		QWidget *m_pFrameEditor;
 		SheetPreview *m_pPreview;
+
+		QPushButton *m_pPlayButton;
+		QDoubleSpinBox *m_pPlaySpeed;
+		QLabel *m_pPlayStatus;
+		QTimer *m_pPlayTimer;
+		int m_iPlaySequence;
+		int m_iPlayFrame;
 
 		QPushButton *m_pAddFrameButton;
 		QPushButton *m_pDuplicateButton;

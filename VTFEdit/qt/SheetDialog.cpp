@@ -32,6 +32,7 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStackedWidget>
+#include <QTimer>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
@@ -68,8 +69,20 @@ namespace VTFEdit
 	SheetPreview::SheetPreview(QWidget *pParent)
 		: QWidget(pParent)
 		, m_bHasFrame(false)
+		, m_bAnimating(false)
 	{
 		setMinimumSize(160, 160);
+	}
+
+	void SheetPreview::setAnimating(bool bAnimating)
+	{
+		if(m_bAnimating == bAnimating)
+		{
+			return;
+		}
+
+		m_bAnimating = bAnimating;
+		update();
 	}
 
 	void SheetPreview::setImage(const QImage &Image)
@@ -98,6 +111,30 @@ namespace VTFEdit
 
 		if(m_Image.isNull())
 		{
+			return;
+		}
+
+		if(m_bAnimating && m_bHasFrame)
+		{
+			// blow the frame itself up to fill the widget
+			const SheetCoords &Coords = m_Frame.Images[0];
+
+			QRect Source(
+				qRound(Coords.fLeft * m_Image.width()),
+				qRound(Coords.fTop * m_Image.height()),
+				qMax(1, qRound((Coords.fRight - Coords.fLeft) * m_Image.width())),
+				qMax(1, qRound((Coords.fBottom - Coords.fTop) * m_Image.height())));
+			Source = Source.intersected(m_Image.rect());
+
+			if(Source.isEmpty())
+			{
+				return;
+			}
+
+			QSize Frame = Source.size().scaled(size(), Qt::KeepAspectRatio);
+			QRect Target(QPoint((width() - Frame.width()) / 2, (height() - Frame.height()) / 2), Frame);
+
+			Painter.drawImage(Target, m_Image, Source);
 			return;
 		}
 
@@ -139,6 +176,8 @@ namespace VTFEdit
 		, m_iImageWidth(iImageWidth > 0 ? iImageWidth : 1)
 		, m_iImageHeight(iImageHeight > 0 ? iImageHeight : 1)
 		, m_bUpdating(false)
+		, m_iPlaySequence(-1)
+		, m_iPlayFrame(0)
 	{
 		setWindowTitle(tr("Sprite Sheet"));
 
@@ -202,9 +241,34 @@ namespace VTFEdit
 		m_pPreview = new SheetPreview(this);
 		m_pPreview->setImage(m_Image);
 
+		m_pPlayTimer = new QTimer(this);
+		m_pPlayTimer->setSingleShot(true);
+		connect(m_pPlayTimer, &QTimer::timeout, this, &SheetDialog::onPlaybackTimeout);
+
+		m_pPlayButton = new QPushButton(tr("&Play"), this);
+		m_pPlayButton->setToolTip(tr("Play the selected sequence back at its frame durations."));
+		connect(m_pPlayButton, &QPushButton::clicked, this, &SheetDialog::onPlayClicked);
+
+		m_pPlaySpeed = new QDoubleSpinBox(this);
+		m_pPlaySpeed->setDecimals(2);
+		m_pPlaySpeed->setSingleStep(0.25);
+		m_pPlaySpeed->setRange(0.05, 20.0);
+		m_pPlaySpeed->setValue(1.0);
+		m_pPlaySpeed->setSuffix(tr("x"));
+		m_pPlaySpeed->setToolTip(tr("Playback speed multiplier."));
+
+		m_pPlayStatus = new QLabel(this);
+
+		QHBoxLayout *pPlayLayout = new QHBoxLayout();
+		pPlayLayout->addWidget(m_pPlayButton);
+		pPlayLayout->addWidget(new QLabel(tr("Speed:"), this));
+		pPlayLayout->addWidget(m_pPlaySpeed);
+		pPlayLayout->addWidget(m_pPlayStatus, 1);
+
 		QGroupBox *pPreview = new QGroupBox(tr("Preview:"), this);
 		QVBoxLayout *pPreviewLayout = new QVBoxLayout(pPreview);
 		pPreviewLayout->addWidget(m_pPreview, 1);
+		pPreviewLayout->addLayout(pPlayLayout);
 
 		QVBoxLayout *pRightLayout = new QVBoxLayout();
 		pRightLayout->addWidget(m_pEditorStack);
@@ -315,6 +379,8 @@ namespace VTFEdit
 
 	void SheetDialog::rebuildTree(int iSequence, int iFrame)
 	{
+		stopPlayback();
+
 		const bool bUpdating = m_bUpdating;
 		m_bUpdating = true;
 
@@ -387,19 +453,29 @@ namespace VTFEdit
 
 	void SheetDialog::onSelectionChanged()
 	{
+		if(m_iPlaySequence >= 0 && selectedSequence() != m_iPlaySequence)
+		{
+			stopPlayback();
+		}
+
 		updateEditor();
 		updateButtons();
+		updatePlaybackControls();
 	}
 
 	void SheetDialog::updateEditor()
 	{
 		const int iSequence = selectedSequence();
 		const int iFrame = selectedFrame();
+		const bool bPlaying = m_iPlaySequence >= 0;
 
 		if(iSequence < 0)
 		{
 			m_pEditorStack->setCurrentWidget(m_pEmptyEditor);
-			m_pPreview->clearFrame();
+			if(!bPlaying)
+			{
+				m_pPreview->clearFrame();
+			}
 			return;
 		}
 
@@ -422,7 +498,10 @@ namespace VTFEdit
 				.arg(QString::number(fTotal, 'g', 4)).arg(Sequence.Frames.count()));
 
 			m_pEditorStack->setCurrentWidget(m_pSequenceEditor);
-			m_pPreview->clearFrame();
+			if(!bPlaying)
+			{
+				m_pPreview->clearFrame();
+			}
 		}
 		else
 		{
@@ -468,7 +547,10 @@ namespace VTFEdit
 			}
 
 			m_pEditorStack->setCurrentWidget(m_pFrameEditor);
-			m_pPreview->setFrame(Frame, true);
+			if(!bPlaying)
+			{
+				m_pPreview->setFrame(Frame, true);
+			}
 		}
 
 		m_bUpdating = false;
@@ -774,7 +856,10 @@ namespace VTFEdit
 			pItem->setText(0, frameLabel(iFrame, Frame));
 		}
 
-		m_pPreview->setFrame(Frame, true);
+		if(m_iPlaySequence < 0)
+		{
+			m_pPreview->setFrame(Frame, true);
+		}
 	}
 
 	void SheetDialog::onLinkImagesToggled(bool bChecked)
@@ -789,6 +874,128 @@ namespace VTFEdit
 		}
 
 		onFrameEdited();
+	}
+
+	//
+	// Playback.
+	//
+
+	void SheetDialog::onPlayClicked()
+	{
+		if(m_iPlaySequence >= 0)
+		{
+			stopPlayback();
+		}
+		else
+		{
+			startPlayback();
+		}
+
+		updatePlaybackControls();
+	}
+
+	void SheetDialog::startPlayback()
+	{
+		const int iSequence = selectedSequence();
+		if(iSequence < 0 || m_Sheet.sequences().at(iSequence).Frames.isEmpty())
+		{
+			return;
+		}
+
+		m_iPlaySequence = iSequence;
+		m_iPlayFrame = 0;
+
+		m_pPreview->setAnimating(true);
+		showPlaybackFrame();
+		schedulePlaybackFrame();
+	}
+
+	void SheetDialog::stopPlayback()
+	{
+		if(m_iPlaySequence < 0)
+		{
+			return;
+		}
+
+		m_pPlayTimer->stop();
+		m_iPlaySequence = -1;
+		m_iPlayFrame = 0;
+
+		m_pPreview->setAnimating(false);
+		m_pPreview->clearFrame();
+
+		updateEditor();
+		updatePlaybackControls();
+	}
+
+	void SheetDialog::onPlaybackTimeout()
+	{
+		if(m_iPlaySequence < 0 || m_iPlaySequence >= m_Sheet.sequences().count())
+		{
+			stopPlayback();
+			updatePlaybackControls();
+			return;
+		}
+
+		const SheetSequence &Sequence = m_Sheet.sequences().at(m_iPlaySequence);
+
+		if(m_iPlayFrame + 1 >= Sequence.Frames.count())
+		{
+			if(Sequence.bClamp)
+			{
+				// hold the last frame
+				stopPlayback();
+				updatePlaybackControls();
+				return;
+			}
+
+			m_iPlayFrame = 0;
+		}
+		else
+		{
+			m_iPlayFrame++;
+		}
+
+		showPlaybackFrame();
+		schedulePlaybackFrame();
+		updatePlaybackControls();
+	}
+
+	void SheetDialog::showPlaybackFrame()
+	{
+		const SheetSequence &Sequence = m_Sheet.sequences().at(m_iPlaySequence);
+		m_pPreview->setFrame(Sequence.Frames.at(m_iPlayFrame), true);
+	}
+
+	void SheetDialog::schedulePlaybackFrame()
+	{
+		const SheetSequence &Sequence = m_Sheet.sequences().at(m_iPlaySequence);
+
+		const double fSpeed = qMax(0.01, m_pPlaySpeed->value());
+		const double fDuration = Sequence.Frames.at(m_iPlayFrame).fDuration / fSpeed;
+
+		m_pPlayTimer->start(qBound(10, qRound(fDuration * 1000.0), 60000));
+	}
+
+	void SheetDialog::updatePlaybackControls()
+	{
+		const int iSequence = selectedSequence();
+		const bool bPlaying = m_iPlaySequence >= 0;
+
+		m_pPlayButton->setText(bPlaying ? tr("&Stop") : tr("&Play"));
+		m_pPlayButton->setEnabled(bPlaying
+			|| (iSequence >= 0 && !m_Sheet.sequences().at(iSequence).Frames.isEmpty()));
+
+		if(bPlaying)
+		{
+			m_pPlayStatus->setText(tr("Frame %1 of %2")
+				.arg(m_iPlayFrame)
+				.arg(m_Sheet.sequences().at(m_iPlaySequence).Frames.count() - 1));
+		}
+		else
+		{
+			m_pPlayStatus->clear();
+		}
 	}
 
 	//
