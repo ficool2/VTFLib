@@ -238,6 +238,7 @@ typedef enum tagVTFResourceEntryType
 	VTF_RSRC_TEXTURE_SETTINGS_EX = MAKE_VTF_RSRC_IDF('T', 'S', 'O', RSRCF_HAS_NO_DATA_CHUNK),
 	VTF_RSRC_KEY_VALUE_DATA = MAKE_VTF_RSRC_ID('K', 'V', 'D'),
 	VTF_RSRC_AUX_COMPRESSION_INFO = MAKE_VTF_RSRC_ID('A', 'X', 'C'),
+	VTF_RSRC_PARALLAX_CUBEMAP = MAKE_VTF_RSRC_ID('P', 'C', 'C'),
 	VTF_RSRC_MAX_DICTIONARY_ENTRIES = 32
 } VTFResourceEntryType;
 
@@ -332,6 +333,13 @@ typedef struct tagSVTFTextureLODControlResource
 	vlByte ResolutionClampV;
 	vlByte Padding[2];
 } SVTFTextureLODControlResource;
+
+//! Parallax corrected cubemap settings
+typedef struct tagSVTFParallaxCubemapResource
+{
+	vlSingle Origin[4];			//!< origin of the cubemap
+	vlSingle InvObbMatrix[16];	//!< row major inverse of the oriented bounding box transform
+} SVTFParallaxCubemapResource;
 #pragma pack()
 
 typedef enum tagVLProc
