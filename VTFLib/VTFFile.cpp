@@ -15,7 +15,7 @@
 #include "VTFDXTn.h"
 #include "VTFMathlib.h"
 
-#include "Compressonator.h"
+#include "compressonator.h"
 
 #include "miniz.h"
 #include "zstd.h"

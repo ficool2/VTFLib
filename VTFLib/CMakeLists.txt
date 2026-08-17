@@ -22,8 +22,6 @@ add_library(vtflib SHARED
 	VTFMathlib.cpp
 	VTFWrapper.cpp
 	Resource.rc
-	"${VTFLIB_THIRDPARTY}/miniz/miniz.c"
-	"${VTFLIB_THIRDPARTY}/zstd/zstd.c"
 )
 
 set_target_properties(vtflib PROPERTIES
@@ -48,12 +46,12 @@ target_include_directories(vtflib
 	PRIVATE
 		"${CMAKE_CURRENT_SOURCE_DIR}"
 		"${VTFLIB_THIRDPARTY}/include"
-		"${VTFLIB_THIRDPARTY}/miniz"
-		"${VTFLIB_THIRDPARTY}/zstd"
 	INTERFACE
 		"${CMAKE_SOURCE_DIR}/lib"
 )
 
 target_link_libraries(vtflib PRIVATE
-	"$<IF:$<CONFIG:Debug>,${VTFLIB_THIRDPARTY}/lib/Compressonator_MTd.lib,${VTFLIB_THIRDPARTY}/lib/Compressonator_MT.lib>"
+	miniz
+	zstd
+	CMP_Compressonator
 )

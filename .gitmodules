@@ -1,0 +1,21 @@
+[submodule "thirdparty/DevIL"]
+	path = thirdparty/DevIL
+	url = https://github.com/ficool2/DevIL
+[submodule "thirdparty/zlib"]
+	path = thirdparty/zlib
+	url = https://github.com/madler/zlib
+[submodule "thirdparty/libjpeg-turbo"]
+	path = thirdparty/libjpeg-turbo
+	url = https://github.com/libjpeg-turbo/libjpeg-turbo
+[submodule "thirdparty/libpng"]
+	path = thirdparty/libpng
+	url = https://github.com/pnggroup/libpng
+[submodule "thirdparty/miniz"]
+	path = thirdparty/miniz
+	url = https://github.com/richgel999/miniz
+[submodule "thirdparty/zstd"]
+	path = thirdparty/zstd
+	url = https://github.com/facebook/zstd
+[submodule "thirdparty/compressonator"]
+	path = thirdparty/compressonator
+	url = https://github.com/GPUOpen-Tools/compressonator

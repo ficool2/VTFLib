@@ -79,8 +79,3 @@ target_link_libraries(vtfedit PRIVATE
 	Qt6::Network
 )
 
-add_custom_command(TARGET vtfedit POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"$<TARGET_PROPERTY:DevIL,IMPORTED_LOCATION>"
-		"$<TARGET_FILE_DIR:vtfedit>"
-)

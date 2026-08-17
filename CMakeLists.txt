@@ -22,12 +22,7 @@ endforeach()
 
 set(VTFLIB_THIRDPARTY "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty")
 
-add_library(DevIL SHARED IMPORTED GLOBAL)
-set_target_properties(DevIL PROPERTIES
-	IMPORTED_IMPLIB "${VTFLIB_THIRDPARTY}/lib/DevIL.lib"
-	IMPORTED_LOCATION "${VTFLIB_THIRDPARTY}/bin/DevIL.dll"
-	INTERFACE_INCLUDE_DIRECTORIES "${VTFLIB_THIRDPARTY}/include"
-)
+add_subdirectory(thirdparty)
 
 add_subdirectory(VTFLib)
 

@@ -21,8 +21,3 @@ target_include_directories(vtfcmd PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 target_link_libraries(vtfcmd PRIVATE vtflib DevIL)
 
-add_custom_command(TARGET vtfcmd POST_BUILD
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-		"$<TARGET_PROPERTY:DevIL,IMPORTED_LOCATION>"
-		"$<TARGET_FILE_DIR:vtfcmd>"
-)

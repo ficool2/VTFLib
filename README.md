@@ -19,7 +19,7 @@ The repository contains the following folders:
 
 * **lib** - Prebuilt library binaries and the public C header.
 * **script** - Helper scripts.
-* **thirdparty** - Bundled dependencies (DevIL, miniz, zstd).
+* **thirdparty** - Dependencies, all built from source as git submodules.
 * **VTFCmd** - CLI source code.
 * **VTFEdit** - Qt program source code
 * **VTFLib** - C++ library source code.
@@ -27,6 +27,12 @@ The repository contains the following folders:
 ## Building with CMake
 
 Windows only. Requires CMake 3.21+, a C++17 compiler and Qt 6.
+
+All third party dependencies are built from source, so the submodules must be checked out first:
+
+```
+git submodule update --init --recursive
+```
 
 ```
 cmake -B build -DCMAKE_PREFIX_PATH=<path-to-Qt6> -A x64

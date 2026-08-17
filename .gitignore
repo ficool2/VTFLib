@@ -333,3 +333,6 @@ ASALocalRun/
 build/
 out/
 CMakeUserPresets.json
+
+# Thirdparty
+thirdparty/
