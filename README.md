@@ -19,7 +19,6 @@ The repository contains the following folders:
 
 * **lib** - Prebuilt library binaries and the public C header.
 * **script** - Helper scripts.
-* **sln** - Legacy Visual Studio solutions (the CMake build is preferred).
 * **thirdparty** - Bundled dependencies (DevIL, miniz, zstd).
 * **VTFCmd** - CLI source code.
 * **VTFEdit** - Qt program source code
