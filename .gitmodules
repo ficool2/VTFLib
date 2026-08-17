@@ -19,3 +19,9 @@
 [submodule "thirdparty/compressonator"]
 	path = thirdparty/compressonator
 	url = https://github.com/GPUOpen-Tools/compressonator
+[submodule "thirdparty/openexr"]
+	path = thirdparty/openexr
+	url = https://github.com/AcademySoftwareFoundation/openexr
+[submodule "thirdparty/Imath"]
+	path = thirdparty/Imath
+	url = https://github.com/AcademySoftwareFoundation/Imath

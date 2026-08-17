@@ -2,7 +2,7 @@
 
 set(THIRDPARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
-foreach(submodule DevIL zlib libpng libjpeg-turbo)
+foreach(submodule DevIL zlib libpng libjpeg-turbo Imath openexr)
 	if(NOT EXISTS "${THIRDPARTY_DIR}/${submodule}/CMakeLists.txt" AND
 	   NOT EXISTS "${THIRDPARTY_DIR}/${submodule}/README.md")
 		message(FATAL_ERROR
@@ -40,6 +40,9 @@ set_target_properties(zlib_static PROPERTIES
 	MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
 	FOLDER thirdparty
 )
+
+# for OpenEXR
+add_library(ZLIB::ZLIB ALIAS zlib_static)
 
 # ---------------------------------------------------------------------------
 # libpng
@@ -109,6 +112,37 @@ set_target_properties(jpeg-static PROPERTIES
 )
 
 # ---------------------------------------------------------------------------
+# Imath + OpenEXR
+# ---------------------------------------------------------------------------
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+
+set(IMATH_INSTALL OFF CACHE BOOL "" FORCE)
+set(IMATH_INSTALL_PKG_CONFIG OFF CACHE BOOL "" FORCE)
+set(IMATH_INSTALL_SYM_LINK OFF CACHE BOOL "" FORCE)
+
+set(OPENEXR_INSTALL OFF CACHE BOOL "" FORCE)
+set(OPENEXR_INSTALL_TOOLS OFF CACHE BOOL "" FORCE)
+set(OPENEXR_INSTALL_PKG_CONFIG OFF CACHE BOOL "" FORCE)
+set(OPENEXR_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(OPENEXR_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(OPENEXR_FORCE_INTERNAL_IMATH ON CACHE BOOL "" FORCE)
+set(OPENEXR_FORCE_INTERNAL_ZLIB OFF CACHE BOOL "" FORCE)
+
+add_subdirectory("${THIRDPARTY_DIR}/Imath" "${CMAKE_CURRENT_BINARY_DIR}/Imath" EXCLUDE_FROM_ALL)
+add_subdirectory("${THIRDPARTY_DIR}/openexr" "${CMAKE_CURRENT_BINARY_DIR}/openexr" EXCLUDE_FROM_ALL)
+
+foreach(openexr_target Imath ImathConfig Iex IlmThread OpenEXR OpenEXRCore OpenEXRUtil OpenEXRConfig)
+	if(TARGET ${openexr_target})
+		set_target_properties(${openexr_target} PROPERTIES
+			POSITION_INDEPENDENT_CODE ON
+			MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
+			FOLDER thirdparty
+		)
+	endif()
+endforeach()
+
+# ---------------------------------------------------------------------------
 # DevIL
 # ---------------------------------------------------------------------------
 set(DEVIL_DIR "${THIRDPARTY_DIR}/DevIL/DevIL")
@@ -131,7 +165,11 @@ target_compile_definitions(DevIL PRIVATE
 	_CRT_NONSTDC_NO_DEPRECATE
 )
 
-target_link_libraries(DevIL PRIVATE png_static jpeg-static zlib_static)
+target_link_libraries(DevIL PRIVATE png_static jpeg-static zlib_static OpenEXR::OpenEXR)
+
+set_source_files_properties("${DEVIL_DIR}/src-IL/src/il_exr.cpp" PROPERTIES
+	COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/FI${THIRDPARTY_DIR}/devilconfig/il_exr_compat.h,-include${THIRDPARTY_DIR}/devilconfig/il_exr_compat.h>"
+)
 
 set_target_properties(DevIL PROPERTIES
 	OUTPUT_NAME "DevIL"

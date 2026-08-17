@@ -4,7 +4,6 @@
 // handwritten config
 
 /* formats we aren't supporting */
-#define IL_NO_EXR    // OpenEXR
 #define IL_NO_JP2    // JasPer
 #define IL_NO_LCMS   // Little CMS
 #define IL_NO_MNG    // libmng
@@ -14,6 +13,7 @@
 /* built from source */
 /* #undef IL_NO_PNG */
 /* #undef IL_NO_JPG */
+/* #undef IL_NO_EXR */
 
 /* DevIL handle this */
 /* #undef IL_USE_DXTC_NVIDIA */
