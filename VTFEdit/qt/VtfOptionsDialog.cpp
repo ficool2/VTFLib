@@ -139,6 +139,7 @@ namespace VTFEdit
 		pLayout->addWidget(pTabs);
 		pLayout->addWidget(pButtons);
 
+		connect(m_pStripAlpha, &QCheckBox::toggled, this, &VtfOptionsDialog::updateEnabledState);
 		connect(m_pResize, &QCheckBox::toggled, this, &VtfOptionsDialog::updateEnabledState);
 		connect(m_pResizeClamp, &QCheckBox::toggled, this, &VtfOptionsDialog::updateEnabledState);
 		connect(m_pMipmaps, &QCheckBox::toggled, this, &VtfOptionsDialog::updateEnabledState);
@@ -178,7 +179,8 @@ namespace VTFEdit
 			"7.5 is only supported in newer branches, and 7.6 is Strata Source only."));
 		pGeneralForm->addRow(tr("Version:"), m_pVersion);
 		pGeneralForm->addRow(tr("Color Format:"), m_pFormat);
-		pGeneralForm->addRow(tr("Alpha Format:"), m_pAlphaFormat);
+		m_pAlphaFormatLabel = new QLabel(tr("Alpha Format:"), pGeneral);
+		pGeneralForm->addRow(m_pAlphaFormatLabel, m_pAlphaFormat);
 		pGeneralForm->addRow(tr("Texture Type:"), m_pTextureType);
 
 		m_pFlagClampS = new QCheckBox(tr("Clamp S"), pGeneral);
@@ -198,6 +200,11 @@ namespace VTFEdit
 		pFlagsGrid->addWidget(m_pFlagPointSample, 1, 1);
 		pFlagsGrid->setColumnStretch(0, 1);
 		pFlagsGrid->setColumnStretch(1, 1);
+
+		m_pStripAlpha = new QCheckBox(tr("Strip alpha channel"), pGeneral);
+		m_pStripAlpha->setToolTip(tr("Discard the alpha channel of imported images. "
+			"The colour format is always used when this is enabled."));
+		pGeneralForm->addRow(m_pStripAlpha);
 
 		pGeneralForm->addRow(new QLabel(tr("Flags:"), pGeneral));
 		pGeneralForm->addRow(pFlags);
@@ -265,12 +272,10 @@ namespace VTFEdit
 		m_pReflectivity = new QCheckBox(tr("Compute reflectivity"), pMisc);
 		m_pThumbnail = new QCheckBox(tr("Generate thumbnail"), pMisc);
 		m_pSphereMap = new QCheckBox(tr("Generate sphere map"), pMisc);
-		m_pStripAlpha = new QCheckBox(tr("Strip alpha channel"), pMisc);
 		m_pSrgb = new QCheckBox(tr("sRGB"), pMisc);
 		pMiscLayout->addWidget(m_pReflectivity);
 		pMiscLayout->addWidget(m_pThumbnail);
 		pMiscLayout->addWidget(m_pSphereMap);
-		pMiscLayout->addWidget(m_pStripAlpha);
 		pMiscLayout->addWidget(m_pSrgb);
 
 		QGroupBox *pDistanceAlpha = new QGroupBox(tr("Distance Alpha:"), pTab);
@@ -406,6 +411,11 @@ namespace VTFEdit
 	void VtfOptionsDialog::updateEnabledState()
 	{
 		m_pSphereMap->setEnabled(static_cast<VtfTextureType>(m_pTextureType->currentIndex()) == VtfTextureType::EnvironmentMap);
+
+		const bool bAlphaFormat = !m_pStripAlpha->isChecked();
+		m_pAlphaFormat->setEnabled(bAlphaFormat);
+		if(m_pAlphaFormatLabel != nullptr)
+			m_pAlphaFormatLabel->setEnabled(bAlphaFormat);
 
 		m_pResizeMethod->setEnabled(m_pResize->isChecked());
 		m_pResizeFilter->setEnabled(m_pResize->isChecked());

@@ -26,6 +26,7 @@
 class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
+class QLabel;
 class QLineEdit;
 class QSpinBox;
 
@@ -56,6 +57,7 @@ namespace VTFEdit
 
 		QComboBox *m_pFormat;
 		QComboBox *m_pAlphaFormat;
+		QLabel *m_pAlphaFormatLabel;
 		QComboBox *m_pTextureType;
 
 		QCheckBox *m_pFlagClampS;
