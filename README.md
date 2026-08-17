@@ -2,7 +2,7 @@
 
 VTFLib++ is a LGPL open source programming library that provides a C and C++ API that, with a few simple functions, can open and save .vtf and .vmt files, providing access to all known features. The library functions independent of Steam, allowing third party applications to use the library without Steam present or running on the target system.
 
-VTFLib++ includes two GPL example applications, VTFCmd and VTFEdit++. VTFCmd is a C command line frontend for VTFLib++ that can create .vtf and .vmt files from various source formats. It is similar in functionality to Valve's vtex Source SDK utility, but offers a lot more control. VTFEdit++ is a Qt-based graphical frontend for VTFLib++ with viewing and creation capabilities, plus a VMT text editor. Both VTFCmd and VTFEdit++ support several source image formats, including, but not limited to .bmp, .dds, .gif, .jpg, .png and .tga.
+VTFLib++ includes two GPL example applications, VTFCmd and VTFEdit++. VTFCmd is a C command line frontend for VTFLib++ that can create .vtf and .vmt files from various source formats. It is similar in functionality to Valve's vtex Source SDK utility, but offers a lot more control. VTFEdit++ is a Qt-based graphical frontend for VTFLib++ with viewing and creation capabilities, plus a VMT text editor. Both VTFCmd and VTFEdit++ support several source image formats: .bmp, .dds, .gif, .jpg, .png, .tga, .exr, .pfm, .hdr
 
 ## Library/Author Information
 
