@@ -104,7 +104,8 @@ namespace VTFEdit
 		pFromLayout->setContentsMargins(0, 0, 0, 0);
 		m_pFromVTF = new QRadioButton(tr("To"), pFromRow);
 		m_pFromVTFFormat = new QComboBox(pFromRow);
-		m_pFromVTFFormat->addItems({ QStringLiteral("bmp"), QStringLiteral("jpg"),
+		m_pFromVTFFormat->addItems({ QStringLiteral("bmp"), QStringLiteral("exr"),
+			QStringLiteral("hdr"), QStringLiteral("jpg"), QStringLiteral("pfm"),
 			QStringLiteral("png"), QStringLiteral("tga") });
 		pFromLayout->addWidget(m_pFromVTF);
 		pFromLayout->addWidget(m_pFromVTFFormat);
@@ -167,7 +168,7 @@ namespace VTFEdit
 		m_pCreateVMTFiles->setChecked(m_pSettings->bCreateVMTFiles);
 
 		const int iFormat = m_pFromVTFFormat->findText(m_pSettings->sFromVTFFormat);
-		m_pFromVTFFormat->setCurrentIndex(iFormat >= 0 ? iFormat : 3);	// tga
+		m_pFromVTFFormat->setCurrentIndex(iFormat >= 0 ? iFormat : 6);	// tga
 	}
 
 	void BatchConvertDialog::controlsToSettings()
@@ -300,6 +301,9 @@ namespace VTFEdit
 					const vlUInt uiImages = static_cast<vlUInt>(ilGetInteger(IL_NUM_IMAGES)) + 1;
 					vlUInt uiWidth = 0, uiHeight = 0;
 
+					const bool bFloat = VtfFileUtility::IsFloatImage();
+					const vlUInt uiPixelSize = bFloat ? 4 * static_cast<vlUInt>(sizeof(vlSingle)) : 4;
+
 					std::vector<vlByte *> vImageData;
 
 					for(vlUInt k = 0; k < uiImages; k++)
@@ -307,7 +311,7 @@ namespace VTFEdit
 						ilBindImage(uiImage);
 						ilActiveImage(static_cast<ILuint>(k));
 
-						if(!ilConvertImage(IL_RGBA, IL_UNSIGNED_BYTE))
+						if(!ilConvertImage(IL_RGBA, bFloat ? IL_FLOAT : IL_UNSIGNED_BYTE))
 						{
 							log(tr("Error converting %1.").arg(sName), LogRed);
 							bError = true;
@@ -327,18 +331,24 @@ namespace VTFEdit
 							break;
 						}
 
-						vlByte *lpFrameData = new vlByte[uiWidth * uiHeight * 4];
-						memcpy(lpFrameData, ilGetData(), uiWidth * uiHeight * 4);
+						const size_t uiFrameSize = static_cast<size_t>( uiWidth ) * uiHeight * uiPixelSize;
+
+						vlByte *lpFrameData = new vlByte[uiFrameSize];
+						memcpy(lpFrameData, ilGetData(), uiFrameSize);
 						vImageData.push_back(lpFrameData);
 
-						bHasAlpha = bHasAlpha || (!m_pOptions->StripAlpha
-							&& VtfFileUtility::HasAlphaData(lpFrameData, uiWidth, uiHeight));
+						if(!m_pOptions->StripAlpha)
+						{
+							bHasAlpha = bHasAlpha || (bFloat
+								? VtfFileUtility::HasAlphaDataRGBA32F(reinterpret_cast<vlSingle *>(lpFrameData), uiWidth, uiHeight)
+								: VtfFileUtility::HasAlphaData(lpFrameData, uiWidth, uiHeight));
+						}
 					}
 
 					// Leave the base image bound for the next file.
 					ilBindImage(uiImage);
 
-					if(!bError && !vImageData.empty() && m_pOptions->DistanceAlpha)
+					if(!bError && !vImageData.empty() && m_pOptions->DistanceAlpha && !bFloat)
 					{
 						VtfFileUtility::ApplyDistanceAlpha(vImageData, uiWidth, uiHeight, *m_pOptions);
 						bHasAlpha = true;
@@ -349,7 +359,8 @@ namespace VTFEdit
 						VTFCreateOptions.ImageFormat = bHasAlpha ? m_pOptions->AlphaFormat : m_pOptions->NormalFormat;
 
 						const bool bCreated = VTFFile.Create(uiWidth, uiHeight, static_cast<vlUInt>(vImageData.size()),
-							1, 1, &vImageData[0], VTFCreateOptions) != vlFalse;
+							1, 1, &vImageData[0], VTFCreateOptions,
+							bFloat ? IMAGE_FORMAT_RGBA32323232F : IMAGE_FORMAT_RGBA8888) != vlFalse;
 						if(bCreated)
 						{
 							VtfFileUtility::ApplyFlags(*m_pOptions, &VTFFile);
@@ -402,8 +413,12 @@ namespace VTFEdit
 					const vlUInt uiWidth = VTFFile.GetWidth();
 					const vlUInt uiHeight = VTFFile.GetHeight();
 
+					const bool bFloat = VtfFileUtility::IsFloatImageFileName(
+						QLatin1Char('.') + m_pFromVTFFormat->currentText());
+					const VTFImageFormat DestFormat = bFloat ? IMAGE_FORMAT_RGBA32323232F : IMAGE_FORMAT_RGBA8888;
+
 					std::vector<vlByte> ImageData(
-						VTFFile.ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888));
+						VTFFile.ComputeImageSize(uiWidth, uiHeight, 1, DestFormat));
 
 					const vlUInt uiFrameCount = VTFFile.GetFrameCount();
 					const vlUInt uiFaceCount = VTFFile.GetFaceCount();
@@ -427,8 +442,8 @@ namespace VTFEdit
 									File.completeBaseName() + sSuffix
 										+ QLatin1Char('.') + m_pFromVTFFormat->currentText()));
 
-								if(!VTFFile.ConvertToRGBA8888(VTFFile.GetData(uiFrame, uiFace, uiSlice, 0),
-									ImageData.data(), uiWidth, uiHeight, VTFFile.GetDecodeFormat()))
+								if(!VTFFile.Convert(VTFFile.GetData(uiFrame, uiFace, uiSlice, 0),
+									ImageData.data(), uiWidth, uiHeight, VTFFile.GetDecodeFormat(), DestFormat))
 								{
 									log(tr("Error converting %1.%2").arg(sName,
 										QString::fromLatin1(vlGetLastError()).replace(QLatin1Char('\n'), QLatin1Char(' '))), LogRed);
@@ -436,9 +451,18 @@ namespace VTFEdit
 								}
 
 								// DevIL likes image data upside down...
-								VTFFile.FlipImage(ImageData.data(), uiWidth, uiHeight);
+								if(bFloat)
+								{
+									VTFFile.FlipImageRGBA32F(
+										reinterpret_cast<vlSingle *>(ImageData.data()), uiWidth, uiHeight);
+								}
+								else
+								{
+									VTFFile.FlipImage(ImageData.data(), uiWidth, uiHeight);
+								}
 
-								if(!ilTexImage(uiWidth, uiHeight, 1, 4, IL_RGBA, IL_UNSIGNED_BYTE, ImageData.data()))
+								if(!ilTexImage(uiWidth, uiHeight, 1, 4, IL_RGBA,
+									bFloat ? IL_FLOAT : IL_UNSIGNED_BYTE, ImageData.data()))
 								{
 									log(tr("Error creating %1.").arg(sName), LogRed);
 									continue;

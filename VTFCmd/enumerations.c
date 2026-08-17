@@ -117,6 +117,18 @@ VTFImageFormat StringToImageFormat(const vlChar *cString)
 	{
 		return IMAGE_FORMAT_RGBA16161616F;
 	}
+	else if(stricmp(cString, "RGBA32323232F") == 0)
+	{
+		return IMAGE_FORMAT_RGBA32323232F;
+	}
+	else if(stricmp(cString, "RGB323232F") == 0)
+	{
+		return IMAGE_FORMAT_RGB323232F;
+	}
+	else if(stricmp(cString, "R32F") == 0)
+	{
+		return IMAGE_FORMAT_R32F;
+	}
 	else if(stricmp(cString, "RGBA16161616") == 0)
 	{
 		return IMAGE_FORMAT_RGBA16161616;

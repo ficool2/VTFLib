@@ -154,7 +154,7 @@ namespace VTFEdit
 			// keeo in sync with onImport
 			static const char *const szExtensions[] =
 			{
-				".bmp", ".dds", ".gif", ".jpg", ".jpeg", ".png", ".tga"
+				".bmp", ".dds", ".exr", ".gif", ".hdr", ".jpg", ".jpeg", ".pfm", ".png", ".tga"
 			};
 
 			for(const char *const szExtension : szExtensions)
@@ -972,7 +972,8 @@ namespace VTFEdit
 		m_pAnimateFps->setEnabled(pVTFFile->GetFrameCount() > 1);
 
 		m_pHdrExposure->setEnabled(pVTFFile->GetFormat() == IMAGE_FORMAT_RGBA16161616F
-			|| pVTFFile->GetFormat() == IMAGE_FORMAT_BC6H);
+			|| pVTFFile->GetFormat() == IMAGE_FORMAT_BC6H
+			|| VTFLib::CVTFFile::IsFloatFormat(pVTFFile->GetFormat()) != vlFalse);
 
 		const vlUInt uiFlags = pVTFFile->GetFlags();
 
@@ -2177,6 +2178,7 @@ namespace VTFEdit
 
 		vlUInt uiWidth = 0, uiHeight = 0;
 		bool bHasAlpha = false;
+		bool bFloat = false;
 
 		std::vector<vlByte *> vImageData;
 
@@ -2200,13 +2202,21 @@ namespace VTFEdit
 			const ILuint uiImage = static_cast<ILuint>(ilGetInteger(IL_CUR_IMAGE));
 			const vlUInt uiImages = static_cast<vlUInt>(ilGetInteger(IL_NUM_IMAGES)) + 1;
 
+			if(vImageData.empty())
+			{
+				// TODO only deciding this by first image right now
+				bFloat = VtfFileUtility::IsFloatImage();
+			}
+
+			const vlUInt uiPixelSize = bFloat ? 4 * static_cast<vlUInt>(sizeof(vlSingle)) : 4;
+
 			// Copy every animation frame the file contains.
 			for(vlUInt j = 0; j < uiImages; j++)
 			{
 				ilBindImage(uiImage);
 				ilActiveImage(static_cast<ILuint>(j));
 
-				if(!ilConvertImage(IL_RGBA, IL_UNSIGNED_BYTE))
+				if(!ilConvertImage(IL_RGBA, bFloat ? IL_FLOAT : IL_UNSIGNED_BYTE))
 				{
 					bError = true;
 
@@ -2229,19 +2239,25 @@ namespace VTFEdit
 					break;
 				}
 
-				vlByte *lpFrameData = new vlByte[uiWidth * uiHeight * 4];
-				memcpy(lpFrameData, ilGetData(), uiWidth * uiHeight * 4);
+				const size_t uiFrameSize = static_cast<size_t>( uiWidth ) * uiHeight * uiPixelSize;
+
+				vlByte *lpFrameData = new vlByte[uiFrameSize];
+				memcpy(lpFrameData, ilGetData(), uiFrameSize);
 				vImageData.push_back(lpFrameData);
 
-				bHasAlpha = bHasAlpha || (!m_Options.StripAlpha
-					&& VtfFileUtility::HasAlphaData(lpFrameData, uiWidth, uiHeight));
+				if(!m_Options.StripAlpha)
+				{
+					bHasAlpha = bHasAlpha || (bFloat
+						? VtfFileUtility::HasAlphaDataRGBA32F(reinterpret_cast<vlSingle *>(lpFrameData), uiWidth, uiHeight)
+						: VtfFileUtility::HasAlphaData(lpFrameData, uiWidth, uiHeight));
+				}
 			}
 
 			// Leave the base image bound for the next file.
 			ilBindImage(uiImage);
 		}
 
-		if(!bError && m_Options.DistanceAlpha && !vImageData.empty())
+		if(!bError && m_Options.DistanceAlpha && !bFloat && !vImageData.empty())
 		{
 			VtfFileUtility::ApplyDistanceAlpha(vImageData, uiWidth, uiHeight, m_Options);
 			bHasAlpha = true;
@@ -2249,7 +2265,7 @@ namespace VTFEdit
 
 		if(!bError)
 		{
-			createFromImages(vImageData, uiWidth, uiHeight, bHasAlpha,
+			createFromImages(vImageData, uiWidth, uiHeight, bHasAlpha, bFloat,
 				sFileNames.isEmpty() ? QString() : sFileNames.first());
 		}
 
@@ -2260,7 +2276,7 @@ namespace VTFEdit
 	}
 
 	void MainWindow::createFromImages(const std::vector<vlByte *> &vImageData, vlUInt uiWidth, vlUInt uiHeight,
-		bool bHasAlpha, const QString &sSourceFileName)
+		bool bHasAlpha, bool bFloat, const QString &sSourceFileName)
 	{
 		VTFLib::CVTFFile *pVTFFile = new VTFLib::CVTFFile();
 
@@ -2275,7 +2291,8 @@ namespace VTFEdit
 		VTFCreateOptions.ImageFormat = bHasAlpha ? m_Options.AlphaFormat : m_Options.NormalFormat;
 
 		const bool bCreated =
-			pVTFFile->Create(uiWidth, uiHeight, uiFrames, uiFaces, uiSlices, lpImageData, VTFCreateOptions) != vlFalse;
+			pVTFFile->Create(uiWidth, uiHeight, uiFrames, uiFaces, uiSlices, lpImageData, VTFCreateOptions,
+				bFloat ? IMAGE_FORMAT_RGBA32323232F : IMAGE_FORMAT_RGBA8888) != vlFalse;
 		if(bCreated)
 		{
 			VtfFileUtility::ApplyFlags(m_Options, pVTFFile);
@@ -2319,19 +2336,29 @@ namespace VTFEdit
 		m_pVTFFile->ComputeMipmapDimensions(m_pVTFFile->GetWidth(), m_pVTFFile->GetHeight(),
 			m_pVTFFile->GetDepth(), static_cast<vlUInt>(m_pMipmap->value()), uiWidth, uiHeight, uiDepth);
 
-		std::vector<vlByte> ImageData(m_pVTFFile->ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888));
+		const bool bFloat = VtfFileUtility::IsFloatImageFileName(sFileName);
+		const VTFImageFormat DestFormat = bFloat ? IMAGE_FORMAT_RGBA32323232F : IMAGE_FORMAT_RGBA8888;
 
-		m_pVTFFile->ConvertToRGBA8888(
+		std::vector<vlByte> ImageData(m_pVTFFile->ComputeImageSize(uiWidth, uiHeight, 1, DestFormat));
+
+		m_pVTFFile->Convert(
 			m_pVTFFile->GetData(static_cast<vlUInt>(m_pFrame->value()), static_cast<vlUInt>(m_pFace->value()),
 				static_cast<vlUInt>(m_pSlice->value()), static_cast<vlUInt>(m_pMipmap->value())),
-			ImageData.data(), uiWidth, uiHeight, m_pVTFFile->GetDecodeFormat());
+			ImageData.data(), uiWidth, uiHeight, m_pVTFFile->GetDecodeFormat(), DestFormat);
 
 		// DevIL likes image data upside down...
-		m_pVTFFile->FlipImage(ImageData.data(), uiWidth, uiHeight);
+		if(bFloat)
+		{
+			m_pVTFFile->FlipImageRGBA32F(reinterpret_cast<vlSingle *>(ImageData.data()), uiWidth, uiHeight);
+		}
+		else
+		{
+			m_pVTFFile->FlipImage(ImageData.data(), uiWidth, uiHeight);
+		}
 
 		const QByteArray Path = QDir::toNativeSeparators(sFileName).toLocal8Bit();
 
-		if(!(ilTexImage(uiWidth, uiHeight, 1, 4, IL_RGBA, IL_UNSIGNED_BYTE, ImageData.data())
+		if(!(ilTexImage(uiWidth, uiHeight, 1, 4, IL_RGBA, bFloat ? IL_FLOAT : IL_UNSIGNED_BYTE, ImageData.data())
 			&& ilSaveImage(Path.constData())))
 		{
 			QMessageBox::critical(this, QApplication::applicationName(), tr("Error saving image."));
@@ -2355,7 +2382,10 @@ namespace VTFEdit
 		m_pVTFFile->ComputeMipmapDimensions(m_pVTFFile->GetWidth(), m_pVTFFile->GetHeight(),
 			m_pVTFFile->GetDepth(), static_cast<vlUInt>(m_pMipmap->value()), uiWidth, uiHeight, uiDepth);
 
-		std::vector<vlByte> ImageData(m_pVTFFile->ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888));
+		const bool bFloat = VtfFileUtility::IsFloatImageFileName(sFileName);
+		const VTFImageFormat DestFormat = bFloat ? IMAGE_FORMAT_RGBA32323232F : IMAGE_FORMAT_RGBA8888;
+
+		std::vector<vlByte> ImageData(m_pVTFFile->ComputeImageSize(uiWidth, uiHeight, 1, DestFormat));
 
 		for(vlUInt i = 0; i < m_pVTFFile->GetFrameCount(); i++)
 		{
@@ -2363,11 +2393,18 @@ namespace VTFEdit
 			{
 				for(vlUInt k = 0; k < m_pVTFFile->GetDepth(); k++)
 				{
-					m_pVTFFile->ConvertToRGBA8888(
+					m_pVTFFile->Convert(
 						m_pVTFFile->GetData(i, j, k, static_cast<vlUInt>(m_pMipmap->value())),
-						ImageData.data(), uiWidth, uiHeight, m_pVTFFile->GetDecodeFormat());
+						ImageData.data(), uiWidth, uiHeight, m_pVTFFile->GetDecodeFormat(), DestFormat);
 
-					m_pVTFFile->FlipImage(ImageData.data(), uiWidth, uiHeight);
+					if(bFloat)
+					{
+						m_pVTFFile->FlipImageRGBA32F(reinterpret_cast<vlSingle *>(ImageData.data()), uiWidth, uiHeight);
+					}
+					else
+					{
+						m_pVTFFile->FlipImage(ImageData.data(), uiWidth, uiHeight);
+					}
 
 					const QString sFramePath = QStringLiteral("%1_%2_%3_%4%5")
 						.arg(sStem)
@@ -2378,7 +2415,7 @@ namespace VTFEdit
 
 					const QByteArray Path = QDir::toNativeSeparators(sFramePath).toLocal8Bit();
 
-					if(!(ilTexImage(uiWidth, uiHeight, 1, 4, IL_RGBA, IL_UNSIGNED_BYTE, ImageData.data())
+					if(!(ilTexImage(uiWidth, uiHeight, 1, 4, IL_RGBA, bFloat ? IL_FLOAT : IL_UNSIGNED_BYTE, ImageData.data())
 						&& ilSaveImage(Path.constData())))
 					{
 						QMessageBox::critical(this, QApplication::applicationName(), tr("Error saving image."));
@@ -2623,9 +2660,10 @@ namespace VTFEdit
 		// keep in sync with IsImportableFileName
 		const QStringList sFileNames = QFileDialog::getOpenFileNames(this, tr("Import"),
 			FileDialogHistory::s_sImageDirectory,
-			tr("Supported Files (*.bmp *.dds *.gif *.jpg *.jpeg *.png *.tga);;"
-				"BMP Files (*.bmp);;DDS Files (*.dds);;GIF Files (*.gif);;"
-				"JPEG Files (*.jpg *.jpeg);;PNG Files (*.png);;TGA Files (*.tga);;"
+			tr("Supported Files (*.bmp *.dds *.exr *.gif *.hdr *.jpg *.jpeg *.pfm *.png *.tga);;"
+				"BMP Files (*.bmp);;DDS Files (*.dds);;EXR Files (*.exr);;GIF Files (*.gif);;"
+				"HDR Files (*.hdr);;JPEG Files (*.jpg *.jpeg);;PFM Files (*.pfm);;"
+				"PNG Files (*.png);;TGA Files (*.tga);;"
 				"All Files (*.*)"));
 
 		if(!sFileNames.isEmpty())
@@ -2641,7 +2679,8 @@ namespace VTFEdit
 		const QString sFileName = QFileDialog::getSaveFileName(this, tr("Export"),
 			FileDialogHistory::path(FileDialogHistory::s_sImageDirectory,
 				QFileInfo(m_sFileName).completeBaseName()),
-			tr("BMP Files (*.bmp);;JPEG Files (*.jpg *.jpeg);;PNG Files (*.png);;TGA Files (*.tga)"));
+			tr("BMP Files (*.bmp);;EXR Files (*.exr);;HDR Files (*.hdr);;JPEG Files (*.jpg *.jpeg);;"
+				"PFM Files (*.pfm);;PNG Files (*.png);;TGA Files (*.tga)"));
 
 		if(!sFileName.isEmpty())
 		{
@@ -2656,7 +2695,8 @@ namespace VTFEdit
 		const QString sFileName = QFileDialog::getSaveFileName(this, tr("Export All"),
 			FileDialogHistory::path(FileDialogHistory::s_sImageDirectory,
 				QFileInfo(m_sFileName).completeBaseName()),
-			tr("BMP Files (*.bmp);;JPEG Files (*.jpg *.jpeg);;PNG Files (*.png);;TGA Files (*.tga)"));
+			tr("BMP Files (*.bmp);;EXR Files (*.exr);;HDR Files (*.hdr);;JPEG Files (*.jpg *.jpeg);;"
+				"PFM Files (*.pfm);;PNG Files (*.png);;TGA Files (*.tga)"));
 
 		if(!sFileName.isEmpty())
 		{
@@ -2762,7 +2802,7 @@ namespace VTFEdit
 			bHasAlpha = true;
 		}
 
-		createFromImages(vImageData, uiWidth, uiHeight, bHasAlpha, QString());
+		createFromImages(vImageData, uiWidth, uiHeight, bHasAlpha, false, QString());
 
 		delete[] vImageData[0];
 	}

@@ -29,6 +29,29 @@ namespace VTFEdit
 {
 	namespace VtfFileUtility
 	{
+		bool IsFloatImage()
+		{
+			const ILint iType = ilGetInteger(IL_IMAGE_TYPE);
+
+			return iType == IL_FLOAT || iType == IL_DOUBLE || iType == IL_HALF;
+		}
+
+		bool IsFloatImageFileName(const QString &sFileName)
+		{
+			// keep in sync with the file dialog filters in MainWindow
+			static const char *const szExtensions[] = { ".exr", ".pfm", ".hdr" };
+
+			for(const char *const szExtension : szExtensions)
+			{
+				if(sFileName.endsWith(QLatin1String(szExtension), Qt::CaseInsensitive))
+				{
+					return true;
+				}
+			}
+
+			return false;
+		}
+
 		bool HasAlphaData(const vlByte *lpImageData, vlUInt uiWidth, vlUInt uiHeight)
 		{
 			if(lpImageData == nullptr)
@@ -39,6 +62,24 @@ namespace VTFEdit
 			for(vlUInt i = 3; i < uiWidth * uiHeight * 4; i += 4)
 			{
 				if(lpImageData[i] != 255)
+				{
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		bool HasAlphaDataRGBA32F(const vlSingle *lpImageData, vlUInt uiWidth, vlUInt uiHeight)
+		{
+			if(lpImageData == nullptr)
+			{
+				return false;
+			}
+
+			for(vlUInt i = 3; i < uiWidth * uiHeight * 4; i += 4)
+			{
+				if(lpImageData[i] < 1.0f)
 				{
 					return true;
 				}

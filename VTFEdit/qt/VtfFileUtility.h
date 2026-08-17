@@ -27,8 +27,13 @@ namespace VTFEdit
 {
 	namespace VtfFileUtility
 	{
-		// Returns true if any pixel of an RGBA8888 image is not fully opaque
+		// Returns true if the currently bound image stores floating point channels
+		bool IsFloatImage();
+		bool IsFloatImageFileName(const QString &sFileName);
+
+		// Returns true if any pixel of an image is not fully opaque
 		bool HasAlphaData(const vlByte *lpImageData, vlUInt uiWidth, vlUInt uiHeight);
+		bool HasAlphaDataRGBA32F(const vlSingle *lpImageData, vlUInt uiWidth, vlUInt uiHeight);
 
 		// Replaces the alpha channel of every RGBA8888 frame with a signed distance field
 		bool ApplyDistanceAlpha(std::vector<vlByte *> &vImageData, vlUInt &uiWidth, vlUInt &uiHeight, const VtfOptions &Options);

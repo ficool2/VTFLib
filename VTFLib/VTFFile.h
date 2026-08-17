@@ -871,6 +871,7 @@ namespace VTFLib
 		static vlVoid ComputeImageReflectivityRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight, vlSingle &sX, vlSingle &sY, vlSingle &sZ);
 
 		static vlVoid FlipImage(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight);		//!< Flips an image vertically along its X-axis.
+		static vlVoid FlipImageRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight);	//!< Flips a 32 bit float image vertically along its X-axis.
 		static vlVoid MirrorImage(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight);	//!< Flips an image horizontally along its Y-axis.
 	};
 }

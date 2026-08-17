@@ -805,7 +805,7 @@ void PrintUsage(const vlChar *lpError, ...)
 		Print("         RGB888_BLUESCREEN, BGR888_BLUESCREEN, ARGB8888, BGRA8888, DXT1,\n");
 		Print("         DXT3, DXT5, BGRX8888, BGR565, BGRX5551, BGRA4444,DXT1_ONEBITALPHA,\n");
 		Print("         BGRA5551, UV88, UVWQ8888, RGBA16161616F, RGBA16161616, UVLX8888,\n");
-		Print("         BC7, BC6H\n");
+		Print("         BC7, BC6H, RGBA32323232F, RGB323232F, R32F\n");
 
 		Print("\n");
 		Print("Flags:   POINTSAMPLE, TRILINEAR, CLAMPS, CLAMPT, ANISOTROPIC, HINT_DXT5,\n");
@@ -941,6 +941,10 @@ void ProcessFile(vlChar *lpInputFile)
 	vlSingle sR, sG, sB;			// Reflectivity.
 	vlByte *lpImageData;			// Export data.
 	VTFImageFormat DestFormat;		// Export format.
+	VTFImageFormat SourceFormat;	// Format of the loaded image data.
+	vlBool bFloat;					// Is the image data 32 bit floating point?
+	vlInt iType;					// DevIL data type of the input file.
+	vlUInt uiChannels;				// Bytes per pixel of the export data.
 
 	uiProcessed++;
 
@@ -964,12 +968,24 @@ void ProcessFile(vlChar *lpInputFile)
 		Print("  Height: %d\n", ilGetInteger(IL_IMAGE_HEIGHT));
 		Print("  BPP: %d\n\n", ilGetInteger(IL_IMAGE_BYTES_PER_PIXEL));
 
-		CreateOptions.ImageFormat = ilGetInteger(IL_IMAGE_BYTES_PER_PIXEL) == 4 ? AlphaFormat : NormalFormat;
+		iType = ilGetInteger(IL_IMAGE_TYPE);
+		bFloat = iType == IL_FLOAT || iType == IL_DOUBLE || iType == IL_HALF;
+		SourceFormat = bFloat ? IMAGE_FORMAT_RGBA32323232F : IMAGE_FORMAT_RGBA8888;
+
+		if(bFloat)
+		{
+			iType = ilGetInteger(IL_IMAGE_FORMAT);
+			CreateOptions.ImageFormat = (iType == IL_RGBA || iType == IL_BGRA) ? AlphaFormat : NormalFormat;
+		}
+		else
+		{
+			CreateOptions.ImageFormat = ilGetInteger(IL_IMAGE_BYTES_PER_PIXEL) == 4 ? AlphaFormat : NormalFormat;
+		}
 
 		Print(" Creating texture:\n");
 
 		// Convert input file to RGBA.
-		if(!ilConvertImage(IL_RGBA, IL_UNSIGNED_BYTE))
+		if(!ilConvertImage(IL_RGBA, bFloat ? IL_FLOAT : IL_UNSIGNED_BYTE))
 		{
 			Print("  Error converting input file.\n\n");
 			return;
@@ -981,7 +997,7 @@ void ProcessFile(vlChar *lpInputFile)
 		lpDistanceData = 0;
 
 		// Replace the alpha channel with a distance field.
-		if(bDistanceAlpha)
+		if(bDistanceAlpha && !bFloat)
 		{
 			uiDestWidth = uiImageWidth / uiDistanceAlphaReduce;
 			uiDestHeight = uiImageHeight / uiDistanceAlphaReduce;
@@ -1022,7 +1038,7 @@ void ProcessFile(vlChar *lpInputFile)
 		}
 
 		// Create vtf file.
-		if(!vlImageCreateSingle(uiImageWidth, uiImageHeight, lpSourceData, &CreateOptions))
+		if(!vlImageCreateMultipleEx(uiImageWidth, uiImageHeight, 1, 1, 1, &lpSourceData, &CreateOptions, SourceFormat))
 		{
 			Print("  Error creating vtf file:\n%s\n\n", vlGetLastError());
 			free(lpDistanceData);
@@ -1134,7 +1150,20 @@ void ProcessFile(vlChar *lpInputFile)
 		Print(" Creating texture:\n");
 
 		// Figure out which destination format to use.
-		DestFormat = (vlImageGetFlags() & (TEXTUREFLAGS_ONEBITALPHA | TEXTUREFLAGS_EIGHTBITALPHA)) ? IMAGE_FORMAT_RGBA8888 : IMAGE_FORMAT_RGB888;
+		bFloat = stricmp(lpExportFormat, "exr") == 0 
+			|| stricmp(lpExportFormat, "pfm") == 0
+			|| stricmp(lpExportFormat, "hdr") == 0;
+
+		if(bFloat)
+		{
+			DestFormat = IMAGE_FORMAT_RGBA32323232F;
+		}
+		else
+		{
+			DestFormat = (vlImageGetFlags() & (TEXTUREFLAGS_ONEBITALPHA | TEXTUREFLAGS_EIGHTBITALPHA)) ? IMAGE_FORMAT_RGBA8888 : IMAGE_FORMAT_RGB888;
+		}
+
+		uiChannels = bFloat ? 4 * (vlUInt)sizeof(vlSingle) : (DestFormat == IMAGE_FORMAT_RGBA8888 ? 4 : 3);
 
 		// Alocate the required memory to convert the vtf to.
 		lpImageData = malloc(vlImageComputeImageSize(vlImageGetWidth(), vlImageGetHeight(), 1, 1, DestFormat));
@@ -1155,10 +1184,17 @@ void ProcessFile(vlChar *lpInputFile)
 		}
 
 		// DevIL likes the image data upside down.
-		FlipImage(lpImageData, vlImageGetWidth(), vlImageGetHeight(), DestFormat == IMAGE_FORMAT_RGBA8888 ? 4 : 3);
+		FlipImage(lpImageData, vlImageGetWidth(), vlImageGetHeight(), uiChannels);
 
 		// Create a new image with the converted image data in DevIL.
-		if(!ilTexImage(vlImageGetWidth(), vlImageGetHeight(), 1, DestFormat == IMAGE_FORMAT_RGBA8888 ? 4 : 3, DestFormat == IMAGE_FORMAT_RGBA8888 ? IL_RGBA : IL_RGB, IL_UNSIGNED_BYTE, lpImageData))
+		if(!ilTexImage(
+			vlImageGetWidth(),
+			vlImageGetHeight(), 
+			1, 
+			bFloat ? 4 : (DestFormat == IMAGE_FORMAT_RGBA8888 ? 4 : 3),
+			bFloat || DestFormat == IMAGE_FORMAT_RGBA8888 ? IL_RGBA : IL_RGB, 
+			bFloat ? IL_FLOAT : IL_UNSIGNED_BYTE,
+			lpImageData))
 		{
 			free(lpImageData);
 

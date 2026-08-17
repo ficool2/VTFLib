@@ -581,7 +581,7 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 					lpNewImageDataRGBA8888[i] = new vlByte[this->ComputeImageSize(uiNewWidth, uiNewHeight, 1, SourceFormat)];
 
 					vlBool bResized;
-					if(bResized)
+					if(bFloatSource)
 					{
 						bResized = this->ResizeRGBA32F(
 							(vlSingle *)lpImageDataRGBA8888[i],
@@ -3665,8 +3665,13 @@ vlBool CVTFFile::CompressDXTn(vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, 
 
 	CMP_CompressOptions options = {0};
 	options.dwSize        = sizeof(options);
-	// BC7 at maximum quality is exhaustive and extremely slow
-	options.fquality      = DestFormat == IMAGE_FORMAT_BC7 ? 0.1f : 1.0f;
+	// BC7 and BC6H at maximum quality are exhaustive and extremely slow
+	if(DestFormat == IMAGE_FORMAT_BC7)
+		options.fquality  = 0.1f;
+	else if(DestFormat == IMAGE_FORMAT_BC6H)
+		options.fquality  = 0.05f;
+	else
+		options.fquality  = 1.0f;
 	options.dwnumThreads  = 0;
 	options.bDXT1UseAlpha = DestFormat == IMAGE_FORMAT_DXT1_ONEBITALPHA;
 	options.nAlphaThreshold = 128;
@@ -4887,6 +4892,29 @@ vlVoid CVTFFile::FlipImage(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt u
 			vlUInt uiTemp = *pOne;
 			*pOne = *pTwo;
 			*pTwo = uiTemp;
+		}
+	}
+}
+
+//
+// FlipImageRGBA32F()
+// Flips 32 bit float image data over the X axis.
+//
+vlVoid CVTFFile::FlipImageRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight)
+{
+	for(vlUInt i = 0; i < uiWidth; i++)
+	{
+		for(vlUInt j = 0; j < uiHeight / 2; j++)
+		{
+			vlSingle *pOne = lpImageDataRGBA32F + (i + j * uiWidth) * 4;
+			vlSingle *pTwo = lpImageDataRGBA32F + (i + (uiHeight - j - 1) * uiWidth) * 4;
+
+			for(vlUInt k = 0; k < 4; k++)
+			{
+				vlSingle sTemp = pOne[k];
+				pOne[k] = pTwo[k];
+				pTwo[k] = sTemp;
+			}
 		}
 	}
 }

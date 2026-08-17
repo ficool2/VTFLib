@@ -740,6 +740,11 @@ VTFLIB_API vlVoid vlImageFlipImage(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, 
 	CVTFFile::FlipImage(lpImageDataRGBA8888, uiWidth, uiHeight);
 }
 
+VTFLIB_API vlVoid vlImageFlipImageRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight)
+{
+	CVTFFile::FlipImageRGBA32F(lpImageDataRGBA32F, uiWidth, uiHeight);
+}
+
 VTFLIB_API vlVoid vlImageMirrorImage(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight)
 {
 	CVTFFile::FlipImage(lpImageDataRGBA8888, uiWidth, uiHeight);
