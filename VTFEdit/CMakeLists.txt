@@ -14,6 +14,10 @@ qt_add_executable(vtfedit WIN32
 	qt/SheetFile.h
 	qt/SheetDialog.cpp
 	qt/SheetDialog.h
+	qt/RectFile.cpp
+	qt/RectFile.h
+	qt/HotspotDialog.cpp
+	qt/HotspotDialog.h
 	qt/VtfOptions.cpp
 	qt/VtfOptions.h
 	qt/VtfOptionsDialog.cpp
