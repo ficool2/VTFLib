@@ -19,14 +19,41 @@
 
 #include "ImageView.h"
 
+#include <QBrush>
+#include <QColor>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QTransform>
 
 namespace VTFEdit
 {
+	namespace
+	{
+		const QImage &checkerboardPattern()
+		{
+			static const QImage Pattern = []
+			{
+				QImage Image(16, 16, QImage::Format_RGB32);
+				Image.fill(QColor(255, 255, 255));
+
+				{
+					QPainter Painter(&Image);
+					Painter.fillRect(0, 0, 8, 8, QColor(191, 191, 191));
+					Painter.fillRect(8, 8, 8, 8, QColor(191, 191, 191));
+				}
+
+				return Image;
+			}();
+
+			return Pattern;
+		}
+	}
+
 	ImageView::ImageView(QWidget *pParent)
 		: QWidget(pParent)
 		, m_bTiled(false)
+		, m_fScale(1.0f)
+		, m_bCheckerboard(false)
 	{
 		setMouseTracking(true);
 		setContextMenuPolicy(Qt::CustomContextMenu);
@@ -37,6 +64,40 @@ namespace VTFEdit
 		m_Image = Image;
 		updateGeometryForImage();
 		update();
+	}
+
+	void ImageView::setScale(float fScale)
+	{
+		if(m_fScale == fScale)
+		{
+			return;
+		}
+
+		m_fScale = fScale;
+		updateGeometryForImage();
+		update();
+	}
+
+	void ImageView::setCheckerboard(bool bCheckerboard)
+	{
+		if(m_bCheckerboard == bCheckerboard)
+		{
+			return;
+		}
+
+		m_bCheckerboard = bCheckerboard;
+		update();
+	}
+
+	QSize ImageView::displaySize() const
+	{
+		if(m_Image.isNull())
+		{
+			return QSize(0, 0);
+		}
+
+		return QSize(qMax(1, static_cast<int>(static_cast<float>(m_Image.width()) * m_fScale)),
+			qMax(1, static_cast<int>(static_cast<float>(m_Image.height()) * m_fScale)));
 	}
 
 	void ImageView::setTiled(bool bTiled)
@@ -54,10 +115,11 @@ namespace VTFEdit
 	void ImageView::updateGeometryForImage()
 	{
 		const int iTiles = m_bTiled ? 2 : 1;
+		const QSize Display = displaySize();
 		const QSize Size = m_Image.isNull()
 			? QSize(0, 0)
-			: QSize(m_Image.width() * iTiles + margin() * 2,
-				m_Image.height() * iTiles + margin() * 2);
+			: QSize(Display.width() * iTiles + margin() * 2,
+				Display.height() * iTiles + margin() * 2);
 
 		setFixedSize(Size);
 	}
@@ -71,18 +133,43 @@ namespace VTFEdit
 
 		QPainter Painter(this);
 
+		QBrush Checkerboard;
+		if(m_bCheckerboard)
+		{
+			Checkerboard = QBrush(checkerboardPattern());
+		}
+
+		const QSize Display = displaySize();
 		const int iTiles = m_bTiled ? 2 : 1;
+
 		for(int j = 0; j < iTiles; j++)
 		{
 			for(int i = 0; i < iTiles; i++)
 			{
-				const QRect Target(margin() + i * m_Image.width(), margin() + j * m_Image.height(),
-					m_Image.width(), m_Image.height());
+				const QRect Target(margin() + i * Display.width(), margin() + j * Display.height(),
+					Display.width(), Display.height());
 
-				if(Target.intersects(pEvent->rect()))
+				const QRect Clip = Target.intersected(pEvent->rect());
+				if(Clip.isEmpty())
 				{
-					Painter.drawImage(Target.topLeft(), m_Image);
+					continue;
 				}
+
+				if(m_bCheckerboard)
+				{
+					// checker board is in screen space
+					Checkerboard.setTransform(QTransform::fromTranslate(Target.x(), Target.y()));
+					Painter.fillRect(Clip, Checkerboard);
+				}
+
+				// only rasterize the clipped region
+				Painter.save();
+				Painter.setClipRect(Clip);
+				Painter.translate(Target.topLeft());
+				Painter.scale(static_cast<qreal>(Display.width()) / m_Image.width(),
+					static_cast<qreal>(Display.height()) / m_Image.height());
+				Painter.drawImage(0, 0, m_Image);
+				Painter.restore();
 			}
 		}
 	}
@@ -92,13 +179,14 @@ namespace VTFEdit
 		if(!m_Image.isNull())
 		{
 			const QPoint Position = pEvent->position().toPoint() - QPoint(margin(), margin());
+			const QSize Display = displaySize();
 			const int iTiles = m_bTiled ? 2 : 1;
 
 			if(Position.x() >= 0 && Position.y() >= 0
-				&& Position.x() < m_Image.width() * iTiles
-				&& Position.y() < m_Image.height() * iTiles)
+				&& Position.x() < Display.width() * iTiles
+				&& Position.y() < Display.height() * iTiles)
 			{
-				emit mouseMovedOverImage(Position.x() % m_Image.width(), Position.y() % m_Image.height());
+				emit mouseMovedOverImage(Position.x() % Display.width(), Position.y() % Display.height());
 			}
 		}
 

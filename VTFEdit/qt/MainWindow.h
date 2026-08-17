@@ -24,6 +24,7 @@
 #include "VmtTextEdit.h"
 #include "VtfOptions.h"
 
+#include <QImage>
 #include <QMainWindow>
 #include <QPoint>
 #include <QStringList>
@@ -224,6 +225,7 @@ namespace VTFEdit
 
 		// VTF/VMT plumbing.
 		void updateVtfFile();
+		void invalidateImageCache();
 		void showVtfFile(VTFLib::CVTFFile *pVTFFile);
 		bool getVtfFile();
 		void showVmtFile(Document *pDocument);
@@ -268,6 +270,23 @@ namespace VTFEdit
 
 		float m_fImageScale;
 		float m_fEffectiveImageScale;
+
+		// Cached decoded version of the image for fast compositing
+		std::vector<vlByte> m_DecodedBuffer; // mutually exlcusive with below
+		std::vector<vlSingle> m_DecodedFloatBuffer;
+		VTFLib::CVTFFile *m_pDecodedVTFFile;
+		vlUInt m_uiDecodedWidth;
+		vlUInt m_uiDecodedHeight;
+		vlUInt m_uiDecodedFrame;
+		vlUInt m_uiDecodedFace;
+		vlUInt m_uiDecodedSlice;
+		vlUInt m_uiDecodedMipmap;
+		vlSingle m_sDecodedExposure;
+
+		QImage m_CompositeImage;
+		int m_iCompositeChannel;
+		bool m_bCompositeMask;
+		bool m_bCompositeValid;
 
 		bool m_bImagePanning;
 		QPoint m_ImagePanStartMouse;

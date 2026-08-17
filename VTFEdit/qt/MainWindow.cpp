@@ -192,6 +192,17 @@ namespace VTFEdit
 		, m_pVTFFile(nullptr)
 		, m_fImageScale(1.0f)
 		, m_fEffectiveImageScale(1.0f)
+		, m_pDecodedVTFFile(nullptr)
+		, m_uiDecodedWidth(0)
+		, m_uiDecodedHeight(0)
+		, m_uiDecodedFrame(0)
+		, m_uiDecodedFace(0)
+		, m_uiDecodedSlice(0)
+		, m_uiDecodedMipmap(0)
+		, m_sDecodedExposure(0.0f)
+		, m_iCompositeChannel(-1)
+		, m_bCompositeMask(false)
+		, m_bCompositeValid(false)
 		, m_bImagePanning(false)
 		, m_bUpdatingVtfFile(false)
 		, m_bUpdatingFlags(false)
@@ -844,109 +855,155 @@ namespace VTFEdit
 
 		float fScale = m_fImageScale * fMipmapScale;
 
-		vlUInt uiScaledWidth = 0, uiScaledHeight = 0;
+		// back off the zoom until the image fits the view
+		const double dMaximumDimension = static_cast<double>(ImageView::maximumDisplayDimension());
 
-		for(;;)
+		while(static_cast<double>(uiWidth) * fScale > dMaximumDimension
+			|| static_cast<double>(uiHeight) * fScale > dMaximumDimension)
 		{
-			uiScaledWidth = static_cast<vlUInt>(static_cast<float>(uiWidth) * fScale);
-			uiScaledHeight = static_cast<vlUInt>(static_cast<float>(uiHeight) * fScale);
-
-			if(uiScaledWidth <= 4096 
-				&& uiScaledHeight <= 4096)
-			{
-				break;
-			}
-
 			m_fImageScale *= 0.5f;
 			fScale = m_fImageScale * fMipmapScale;
 		}
 
-		if(uiScaledWidth < 1)
-		{
-			uiScaledWidth = 1;
-		}
-		if(uiScaledHeight < 1)
-		{
-			uiScaledHeight = 1;
-		}
-
-		// Decode image data.
-		const vlUInt uiBufferSize = m_pVTFFile->ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888);
-		std::vector<vlByte> Buffer(uiBufferSize);
-
-		vlSetFloat(VTFLIB_FP16_HDR_EXPOSURE, sHDRExposure);
-		m_pVTFFile->ConvertToRGBA8888(m_pVTFFile->GetData(uiFrame, uiFace, uiSlice, uiMipmap),
-			Buffer.data(), uiWidth, uiHeight, m_pVTFFile->GetDecodeFormat());
-
 		m_fEffectiveImageScale = fScale;
 
-		const float fInverseImageScale = 1.0f / fScale;
+		// try avoid super duper expensive decoding
+		const bool bMipmapChanged = m_pDecodedVTFFile != m_pVTFFile
+			|| m_uiDecodedFrame != uiFrame
+			|| m_uiDecodedFace != uiFace
+			|| m_uiDecodedSlice != uiSlice
+			|| m_uiDecodedMipmap != uiMipmap
+			|| m_uiDecodedWidth != uiWidth
+			|| m_uiDecodedHeight != uiHeight;
 
-		QImage Image(static_cast<int>(uiScaledWidth), static_cast<int>(uiScaledHeight), QImage::Format_RGB888);
+		const VTFImageFormat Format = m_pVTFFile->GetFormat();
+		const bool bHdr = Format == IMAGE_FORMAT_RGBA16161616F
+					   || Format == IMAGE_FORMAT_BC6H
+					   || VTFLib::CVTFFile::IsFloatFormat(Format) != vlFalse;
+
+		if(bMipmapChanged)
+		{
+			if(bHdr)
+			{
+				m_DecodedFloatBuffer.resize(static_cast<size_t>(uiWidth) * uiHeight * 4);
+
+				m_pVTFFile->Convert(m_pVTFFile->GetData(uiFrame, uiFace, uiSlice, uiMipmap),
+					reinterpret_cast<vlByte *>(m_DecodedFloatBuffer.data()), uiWidth, uiHeight,
+					m_pVTFFile->GetDecodeFormat(), IMAGE_FORMAT_RGBA32323232F);
+			}
+			else
+			{
+				m_DecodedFloatBuffer.clear();
+				m_DecodedFloatBuffer.shrink_to_fit();
+			}
+
+			m_pDecodedVTFFile = m_pVTFFile;
+			m_uiDecodedFrame = uiFrame;
+			m_uiDecodedFace = uiFace;
+			m_uiDecodedSlice = uiSlice;
+			m_uiDecodedMipmap = uiMipmap;
+			m_uiDecodedWidth = uiWidth;
+			m_uiDecodedHeight = uiHeight;
+		}
+
+		if(bMipmapChanged || (bHdr && m_sDecodedExposure != sHDRExposure))
+		{
+			m_DecodedBuffer.resize(m_pVTFFile->ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888));
+
+			vlSetFloat(VTFLIB_FP16_HDR_EXPOSURE, sHDRExposure);
+
+			// Decode image data.
+			if(bHdr)
+			{
+				m_pVTFFile->Convert(reinterpret_cast<vlByte *>(m_DecodedFloatBuffer.data()),
+					m_DecodedBuffer.data(), uiWidth, uiHeight,
+					IMAGE_FORMAT_RGBA32323232F, IMAGE_FORMAT_RGBA8888);
+			}
+			else
+			{
+				m_pVTFFile->ConvertToRGBA8888(m_pVTFFile->GetData(uiFrame, uiFace, uiSlice, uiMipmap),
+					m_DecodedBuffer.data(), uiWidth, uiHeight, m_pVTFFile->GetDecodeFormat());
+			}
+
+			m_sDecodedExposure = sHDRExposure;
+
+			m_bCompositeValid = false;
+		}
 
 		// Pick which source channel feeds each output channel.
-		vlUInt uiR = 0, uiG = 1, uiB = 2;
+		int iChannel = -1;
 		if(m_pChannelRAction->isChecked())
 		{
-			uiR = uiG = uiB = 0;
+			iChannel = 0;
 		}
 		else if(m_pChannelGAction->isChecked())
 		{
-			uiR = uiG = uiB = 1;
+			iChannel = 1;
 		}
 		else if(m_pChannelBAction->isChecked())
 		{
-			uiR = uiG = uiB = 2;
+			iChannel = 2;
 		}
 		else if(m_pChannelAAction->isChecked())
 		{
-			uiR = uiG = uiB = 3;
+			iChannel = 3;
 		}
 
 		const bool bMask = m_pMaskAction->isChecked();
 
-		for(vlUInt j = 0; j < uiScaledHeight; j++)
+		if(!m_bCompositeValid || m_iCompositeChannel != iChannel || m_bCompositeMask != bMask)
 		{
-			uchar *pScanline = Image.scanLine(static_cast<int>(j));
+			m_CompositeImage = QImage(static_cast<int>(uiWidth), static_cast<int>(uiHeight),
+				QImage::Format_ARGB32_Premultiplied);
 
-			for(vlUInt i = 0; i < uiScaledWidth; i++)
+			const vlByte *pBuffer = m_DecodedBuffer.data();
+
+			for(vlUInt j = 0; j < uiHeight; j++)
 			{
-				const vlUInt uiSrcIndex = (static_cast<vlUInt>(static_cast<float>(i) * fInverseImageScale)
-					+ static_cast<vlUInt>(static_cast<float>(j) * fInverseImageScale) * uiWidth) * 4;
+				QRgb *pScanline = reinterpret_cast<QRgb *>(m_CompositeImage.scanLine(static_cast<int>(j)));
+				const vlByte *pSource = pBuffer + static_cast<size_t>(j) * uiWidth * 4;
 
-				uchar *pPixel = pScanline + i * 3;
-
-				if(bMask)
+				for(vlUInt i = 0; i < uiWidth; i++, pSource += 4)
 				{
-					// Alpha blend against a checker board.
-					const float fAlpha = static_cast<float>(Buffer[uiSrcIndex + 3]) / 255.0f;
-					const float fOneMinusAlpha = 1.0f - fAlpha;
-					const float fBlend = (i / 8 % 2 == j / 8 % 2) ? 255.0f : 191.25f;
+					const vlUInt uiRed = iChannel < 0 ? pSource[0] : pSource[iChannel];
+					const vlUInt uiGreen = iChannel < 0 ? pSource[1] : pSource[iChannel];
+					const vlUInt uiBlue = iChannel < 0 ? pSource[2] : pSource[iChannel];
+					const vlUInt uiAlpha = bMask ? pSource[3] : 255u;
 
-					pPixel[0] = static_cast<uchar>(fAlpha * static_cast<float>(Buffer[uiSrcIndex + uiR]) + fOneMinusAlpha * fBlend);
-					pPixel[1] = static_cast<uchar>(fAlpha * static_cast<float>(Buffer[uiSrcIndex + uiG]) + fOneMinusAlpha * fBlend);
-					pPixel[2] = static_cast<uchar>(fAlpha * static_cast<float>(Buffer[uiSrcIndex + uiB]) + fOneMinusAlpha * fBlend);
-				}
-				else
-				{
-					pPixel[0] = Buffer[uiSrcIndex + uiR];
-					pPixel[1] = Buffer[uiSrcIndex + uiG];
-					pPixel[2] = Buffer[uiSrcIndex + uiB];
+					pScanline[i] = qRgba(static_cast<int>(uiRed * uiAlpha / 255u),
+						static_cast<int>(uiGreen * uiAlpha / 255u),
+						static_cast<int>(uiBlue * uiAlpha / 255u),
+						static_cast<int>(uiAlpha)); // premultiplied alpha ..
 				}
 			}
+
+			m_iCompositeChannel = iChannel;
+			m_bCompositeMask = bMask;
+			m_bCompositeValid = true;
 		}
 
 		m_pImageView->setTiled(m_pTileAction->isChecked());
-		m_pImageView->setImage(Image);
+		m_pImageView->setCheckerboard(bMask);
+		m_pImageView->setScale(fScale);
+		m_pImageView->setImage(m_CompositeImage);
 
 		m_pStatusInfo1->setText(QStringLiteral("%1%").arg(m_fImageScale * 100.0f));
 
 		m_bUpdatingVtfFile = false;
 	}
 
+	void MainWindow::invalidateImageCache()
+	{
+		m_pDecodedVTFFile = nullptr;
+		m_bCompositeValid = false;
+	}
+
 	void MainWindow::showVtfFile(VTFLib::CVTFFile *pVTFFile)
 	{
 		m_pVTFFile = pVTFFile;
+
+		// the texture data may have changed under us
+		invalidateImageCache();
 
 		const bool bWasSwitching = m_bSwitchingDocument;
 		m_bSwitchingDocument = true;
@@ -1800,6 +1857,7 @@ namespace VTFEdit
 			m_pHdrExposure->setEnabled(false);
 
 			m_pImageView->setImage(QImage());
+			invalidateImageCache();
 
 			hideVtfSidebars();
 
@@ -2463,6 +2521,7 @@ namespace VTFEdit
 		hideVtfSidebars();
 
 		m_pImageView->setImage(QImage());
+		invalidateImageCache();
 
 		m_iVmtErrorLine = 0;
 		m_pVmtEdit->setDocument(m_pEmptyDocument);
@@ -2756,7 +2815,8 @@ namespace VTFEdit
 	{
 		if(!m_pImageView->image().isNull())
 		{
-			QApplication::clipboard()->setImage(m_pImageView->image());
+			QApplication::clipboard()->setImage(
+				m_pImageView->image().convertToFormat(QImage::Format_ARGB32));
 		}
 	}
 
@@ -2986,9 +3046,13 @@ namespace VTFEdit
 			return;
 		}
 
-		const QSize ImageSize = m_pImageView->image().size();
+		const QSize ImageSize = m_pImageView->displaySize();
 
-		if(fFactor > 1.0f && (ImageSize.width() >= 4096 || ImageSize.height() >= 4096))
+		const float dMaximumDimension = static_cast<float>(ImageView::maximumDisplayDimension());
+
+		if(fFactor > 1.0f
+			&& (static_cast<float>(ImageSize.width()) * fFactor > dMaximumDimension
+				|| static_cast<float>(ImageSize.height()) * fFactor > dMaximumDimension))
 		{
 			return;
 		}

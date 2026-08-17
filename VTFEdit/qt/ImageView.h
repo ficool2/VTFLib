@@ -37,8 +37,18 @@ namespace VTFEdit
 		void setTiled(bool bTiled);
 		bool isTiled() const { return m_bTiled; }
 
+		void setScale(float fScale);
+		float scale() const { return m_fScale; }
+
+		void setCheckerboard(bool bCheckerboard);
+		bool hasCheckerboard() const { return m_bCheckerboard; }
+
+		QSize displaySize() const;
+
 		// padding around the image so it can be panned slightly past its borders
 		static int margin() { return 64; }
+
+		static int maximumDisplayDimension() { return (QWIDGETSIZE_MAX - margin() * 2) / 2; }
 
 	signals:
 		void mouseMovedOverImage(int iX, int iY);
@@ -52,5 +62,7 @@ namespace VTFEdit
 
 		QImage m_Image;
 		bool m_bTiled;
+		float m_fScale;
+		bool m_bCheckerboard;
 	};
 }
