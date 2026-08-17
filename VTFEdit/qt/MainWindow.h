@@ -111,6 +111,14 @@ namespace VTFEdit
 		~MainWindow() override;
 
 		void openCommandLineFiles(const QStringList &sFilePaths);
+		void activateWithFiles(const QStringList &sFilePaths);
+
+		static QString configFilePath();
+
+		static bool readSingleInstanceSetting();
+
+	signals:
+		void singleInstanceChanged(bool bEnabled);
 
 	protected:
 		void closeEvent(QCloseEvent *pEvent) override;
@@ -236,7 +244,6 @@ namespace VTFEdit
 		// Recent files and configuration.
 		void addRecentFile(const QString &sFileName);
 		void updateRecentFiles();
-		QString configFilePath() const;
 		bool readConfigFile(const QString &sConfigFile);
 		bool writeConfigFile(const QString &sConfigFile) const;
 
@@ -308,6 +315,7 @@ namespace VTFEdit
 		QAction *m_pCreateVmtFileAction;
 		QAction *m_pConvertFolderAction;
 		QAction *m_pAutoCreateVmtFileAction;
+		QAction *m_pSingleInstanceAction;
 		QAction *m_pVmtEditorOptionsAction;
 		QAction *m_pAboutAction;
 		QMenu *m_pRecentFilesMenu;

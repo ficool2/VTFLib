@@ -18,10 +18,13 @@
  */
 
 #include "MainWindow.h"
+#include "SingleInstance.h"
 #include "VTFLibQt.h"
 
 #include <QApplication>
+#include <QFileInfo>
 #include <QIcon>
+#include <QLocalServer>
 #include <QMessageBox>
 #include <QStyleFactory>
 
@@ -33,6 +36,25 @@ int main(int argc, char *argv[])
 	QApplication::setOrganizationName(QStringLiteral("Breadworks"));
 	QApplication::setApplicationName(QStringLiteral("VTFEdit++"));
 	QApplication::setWindowIcon(QIcon(QStringLiteral(":/app.ico")));
+
+	// Collect the files to open.
+	QStringList CommandLineFiles;
+	{
+		const QStringList Arguments = QApplication::arguments();
+		for(const QString &sArgument : Arguments.mid(1))
+		{
+			CommandLineFiles.append(QFileInfo(sArgument).absoluteFilePath());
+		}
+	}
+
+	// Hand the files to another instance if single instance mode is on.
+	QLocalServer Server;
+
+	const bool bSingleInstance = VTFEdit::MainWindow::readSingleInstanceSetting();
+	if(bSingleInstance && VTFEdit::handOffOrBecomePrimary(Server, CommandLineFiles))
+	{
+		return 0;
+	}
 
 	if(vlGetVersion() != VL_VERSION)
 	{
@@ -59,10 +81,11 @@ int main(int argc, char *argv[])
 		VTFEdit::MainWindow Window;
 		Window.show();
 
-		const QStringList Arguments = QApplication::arguments();
-		if(Arguments.count() >= 2)
+		VTFEdit::setupSingleInstanceServer(Server, Window, bSingleInstance);
+
+		if(!CommandLineFiles.isEmpty())
 		{
-			Window.openCommandLineFiles(Arguments.mid(1));
+			Window.openCommandLineFiles(CommandLineFiles);
 		}
 
 		iResult = QApplication::exec();

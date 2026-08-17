@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network)
 
 qt_standard_project_setup()
 
@@ -6,6 +6,8 @@ qt_add_executable(vtfedit WIN32
 	qt/main.cpp
 	qt/MainWindow.cpp
 	qt/MainWindow.h
+	qt/SingleInstance.cpp
+	qt/SingleInstance.h
 	qt/ImageView.cpp
 	qt/ImageView.h
 	qt/SheetFile.cpp
@@ -70,6 +72,7 @@ target_link_libraries(vtfedit PRIVATE
 	DevIL
 	Qt6::Core
 	Qt6::Widgets
+	Qt6::Network
 )
 
 add_custom_command(TARGET vtfedit POST_BUILD

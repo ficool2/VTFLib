@@ -344,6 +344,12 @@ namespace VTFEdit
 		m_pAutoCreateVmtFileAction = new QAction(tr("&Auto Create VMT File"), this);
 		m_pAutoCreateVmtFileAction->setCheckable(true);
 
+		m_pSingleInstanceAction = new QAction(tr("&Single Instance"), this);
+		m_pSingleInstanceAction->setCheckable(true);
+		m_pSingleInstanceAction->setChecked(true);
+		m_pSingleInstanceAction->setToolTip(tr("Open files as tabs in this window instead of a new window"));
+		connect(m_pSingleInstanceAction, &QAction::toggled, this, &MainWindow::singleInstanceChanged);
+
 		m_pVmtEditorOptionsAction = new QAction(tr("VMT &Editor Options..."), this);
 		connect(m_pVmtEditorOptionsAction, &QAction::triggered, this, &MainWindow::onVmtEditorOptions);
 
@@ -393,6 +399,7 @@ namespace VTFEdit
 
 		QMenu *pOptionsMenu = menuBar()->addMenu(tr("&Options"));
 		pOptionsMenu->addAction(m_pAutoCreateVmtFileAction);
+		pOptionsMenu->addAction(m_pSingleInstanceAction);
 		pOptionsMenu->addSeparator();
 		pOptionsMenu->addAction(m_pVmtEditorOptionsAction);
 
@@ -3073,13 +3080,48 @@ namespace VTFEdit
 	// Configuration.
 	//
 
-	QString MainWindow::configFilePath() const
+	QString MainWindow::configFilePath()
 	{
 		const QString sDirectory = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
 
 		QDir().mkpath(sDirectory);
 
 		return QDir(sDirectory).filePath(QApplication::applicationName() + QStringLiteral(".ini"));
+	}
+
+	// can't think of a better way of doing this.. sorry
+	bool MainWindow::readSingleInstanceSetting()
+	{
+		QFile File(configFilePath());
+		if(!File.open(QIODevice::ReadOnly | QIODevice::Text))
+		{
+			return true;
+		}
+
+		QTextStream Stream(&File);
+
+		while(!Stream.atEnd())
+		{
+			const QString sLine = Stream.readLine();
+			const int iIndex = sLine.indexOf(QLatin1Char('='));
+
+			if(iIndex == -1)
+			{
+				continue;
+			}
+
+			if(sLine.left(iIndex).trimmed().compare(QLatin1String("VTFEdit.SingleInstance"), Qt::CaseInsensitive) != 0)
+			{
+				continue;
+			}
+
+			const QString sVal = sLine.mid(iIndex + 1).trimmed();
+
+			return sVal.compare(QLatin1String("true"), Qt::CaseInsensitive) == 0
+				|| sVal == QLatin1String("1");
+		}
+
+		return true;
 	}
 
 	bool MainWindow::readConfigFile(const QString &sConfigFile)
@@ -3131,6 +3173,8 @@ namespace VTFEdit
 				m_pMipmapFullSizeAction->setChecked(toBool(sVal));
 			else if(sArg.compare(QLatin1String("VTFEdit.AutoCreateVMTFile"), Qt::CaseInsensitive) == 0)
 				m_pAutoCreateVmtFileAction->setChecked(toBool(sVal));
+			else if(sArg.compare(QLatin1String("VTFEdit.SingleInstance"), Qt::CaseInsensitive) == 0)
+				m_pSingleInstanceAction->setChecked(toBool(sVal));
 			else if(sArg.compare(QLatin1String("VTFEdit.LastFileDirectory"), Qt::CaseInsensitive) == 0)
 			{
 				if(QDir(sVal).exists())
@@ -3337,6 +3381,7 @@ namespace VTFEdit
 		Stream << "VTFEdit.Tile = " << boolText(m_pTileAction->isChecked()) << "\n";
 		Stream << "VTFEdit.MipmapFullSize = " << boolText(m_pMipmapFullSizeAction->isChecked()) << "\n";
 		Stream << "VTFEdit.AutoCreateVMTFile = " << boolText(m_pAutoCreateVmtFileAction->isChecked()) << "\n";
+		Stream << "VTFEdit.SingleInstance = " << boolText(m_pSingleInstanceAction->isChecked()) << "\n";
 		Stream << "VTFEdit.LastFileDirectory = " << FileDialogHistory::s_sFileDirectory << "\n";
 		Stream << "VTFEdit.LastImageDirectory = " << FileDialogHistory::s_sImageDirectory << "\n";
 		Stream << "VmtEditor.FontFamily = " << m_VmtEditorSettings.sFontFamily << "\n";
@@ -3466,6 +3511,19 @@ namespace VTFEdit
 		{
 			handleDroppedFiles(sExisting);
 		}
+	}
+
+	void MainWindow::activateWithFiles(const QStringList &sFilePaths)
+	{
+		if(isMinimized())
+		{
+			showNormal();
+		}
+
+		raise();
+		activateWindow();
+
+		openCommandLineFiles(sFilePaths);
 	}
 
 	void MainWindow::dragEnterEvent(QDragEnterEvent *pEvent)
