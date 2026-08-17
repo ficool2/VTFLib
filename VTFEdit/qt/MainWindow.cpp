@@ -149,6 +149,32 @@ namespace VTFEdit
 				|| sFileName.endsWith(QLatin1String(".rect"), Qt::CaseInsensitive);
 		}
 
+		bool IsImportableFileName(const QString &sFileName)
+		{
+			// keeo in sync with onImport
+			static const char *const szExtensions[] =
+			{
+				".bmp", ".dds", ".gif", ".jpg", ".jpeg", ".png", ".tga"
+			};
+
+			for(const char *const szExtension : szExtensions)
+			{
+				if(sFileName.endsWith(QLatin1String(szExtension), Qt::CaseInsensitive))
+				{
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		bool IsSupportedFileName(const QString &sFileName)
+		{
+			return sFileName.endsWith(QLatin1String(".vtf"), Qt::CaseInsensitive)
+				|| IsKeyValuesFileName(sFileName)
+				|| IsImportableFileName(sFileName);
+		}
+
 		QLabel *addInfoRow(QFormLayout *pForm, const QString &sLabel)
 		{
 			QLabel *pValue = new QLabel(pForm->parentWidget());
@@ -2594,6 +2620,7 @@ namespace VTFEdit
 
 	void MainWindow::onImport()
 	{
+		// keep in sync with IsImportableFileName
 		const QStringList sFileNames = QFileDialog::getOpenFileNames(this, tr("Import"),
 			FileDialogHistory::s_sImageDirectory,
 			tr("Supported Files (*.bmp *.dds *.gif *.jpg *.jpeg *.png *.tga);;"
@@ -3688,7 +3715,7 @@ namespace VTFEdit
 		}
 
 		const QString sFirst = pEvent->mimeData()->urls().first().toLocalFile();
-		if(!sFirst.isEmpty() && !QFileInfo(sFirst).isDir())
+		if(!sFirst.isEmpty() && IsSupportedFileName(sFirst) && !QFileInfo(sFirst).isDir())
 		{
 			pEvent->acceptProposedAction();
 		}
@@ -3700,7 +3727,7 @@ namespace VTFEdit
 		for(const QUrl &Url : pEvent->mimeData()->urls())
 		{
 			const QString sFile = Url.toLocalFile();
-			if(!sFile.isEmpty())
+			if(!sFile.isEmpty() && IsSupportedFileName(sFile))
 			{
 				sFiles.append(sFile);
 			}
