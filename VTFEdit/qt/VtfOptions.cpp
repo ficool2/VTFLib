@@ -83,13 +83,13 @@ namespace VTFEdit
 
 		ResizeImage = vlTrue;
 		ResizeMethod = RESIZE_NEAREST_POWER2;
-		ResizeFilter = MIPMAP_FILTER_NICE;
+		ResizeFilter = MIPMAP_FILTER_MITCHELL;
 		ResizeClamp = vlTrue;
 		ResizeClampWidth = 4096;
 		ResizeClampHeight = 4096;
 
 		GenerateMipmaps = vlTrue;
-		MipmapFilter = MIPMAP_FILTER_NICE;
+		MipmapFilter = MIPMAP_FILTER_MITCHELL;
 
 		Version = QStringLiteral("7.4");
 		AuxCompressionLevel = VTF_AUX_COMPRESSION_LEVEL_NONE;
