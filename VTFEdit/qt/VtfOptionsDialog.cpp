@@ -53,7 +53,20 @@ namespace VTFEdit
 			{ "Biggest Multiple Of 4", RESIZE_BIGGEST_MULTIPLE4 },
 			{ "Smallest Multiple Of 4", RESIZE_SMALLEST_MULTIPLE4 },
 		};
-		const char *const FilterNames[] = { "Box", "NICE" };
+		struct MipmapFilterEntry
+		{
+			const char *pName;
+			VTFMipmapFilter Filter;
+		};
+
+		const MipmapFilterEntry MipmapFilters[] = {
+			{ "Mitchell", MIPMAP_FILTER_MITCHELL },
+			{ "Box", MIPMAP_FILTER_BOX },
+			{ "Triangle", MIPMAP_FILTER_TRIANGLE },
+			{ "Cubic", MIPMAP_FILTER_CUBIC },
+			{ "Catrom", MIPMAP_FILTER_CATROM },
+			{ "NICE", MIPMAP_FILTER_NICE },
+		};
 		const char *const VersionNames[] = { "7.6", "7.5", "7.4", "7.3", "7.2", "7.1", "7.0" };
 		const char *const CompressionLevelNames[] = { "None", "Default", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
 		const char *const CompressionMethodNames[] = { "Deflate", "Zstandard" };
@@ -66,6 +79,25 @@ namespace VTFEdit
 				list << QString::number(i);
 			}
 			return list;
+		}
+
+		void fillMipmapFilters(QComboBox *pCombo)
+		{
+			for(const MipmapFilterEntry &Entry : MipmapFilters)
+			{
+				pCombo->addItem(QString::fromLatin1(Entry.pName), static_cast<int>(Entry.Filter));
+			}
+		}
+
+		void setMipmapFilter(QComboBox *pCombo, VTFMipmapFilter Filter)
+		{
+			const int iIndex = pCombo->findData(static_cast<int>(Filter));
+			pCombo->setCurrentIndex(iIndex >= 0 ? iIndex : 0);
+		}
+
+		VTFMipmapFilter mipmapFilter(const QComboBox *pCombo)
+		{
+			return static_cast<VTFMipmapFilter>(pCombo->currentData().toInt());
 		}
 
 		void fillResizeMethods(QComboBox *pCombo)
@@ -216,7 +248,7 @@ namespace VTFEdit
 		fillResizeMethods(m_pResizeMethod);
 		m_pResizeMethod->setToolTip(tr("The size to round the image dimensions to. DXT compressed formats only require multiples of 4."));
 		m_pResizeFilter = new QComboBox(pResize);
-		fill(m_pResizeFilter, FilterNames);
+		fillMipmapFilters(m_pResizeFilter);
 		m_pResizeClamp = new QCheckBox(tr("Clamp resize dimensions"), pResize);
 		m_pMaximumWidth = new QComboBox(pResize);
 		m_pMaximumWidth->addItems(powerOfTwoList());
@@ -235,7 +267,7 @@ namespace VTFEdit
 		QFormLayout *pMipmapsForm = new QFormLayout(pMipmaps);
 		m_pMipmaps = new QCheckBox(tr("Generate mipmaps"), pMipmaps);
 		m_pMipmapFilter = new QComboBox(pMipmaps);
-		fill(m_pMipmapFilter, FilterNames);
+		fillMipmapFilters(m_pMipmapFilter);
 		pMipmapsForm->addRow(m_pMipmaps);
 		pMipmapsForm->addRow(tr("Mipmap Filter:"), m_pMipmapFilter);
 
@@ -479,7 +511,7 @@ namespace VTFEdit
 		m_pResize->setChecked(m_pOptions->ResizeImage != vlFalse);
 		const int iResizeMethodIndex = m_pResizeMethod->findData(static_cast<int>(m_pOptions->ResizeMethod));
 		m_pResizeMethod->setCurrentIndex(iResizeMethodIndex >= 0 ? iResizeMethodIndex : 0);
-		m_pResizeFilter->setCurrentIndex(m_pOptions->ResizeFilter == MIPMAP_FILTER_NICE ? 1 : 0);
+		setMipmapFilter(m_pResizeFilter, m_pOptions->ResizeFilter);
 		m_pResizeClamp->setChecked(m_pOptions->ResizeClamp != vlFalse);
 
 		const int iWidthIndex = m_pMaximumWidth->findText(QString::number(m_pOptions->ResizeClampWidth));
@@ -488,7 +520,7 @@ namespace VTFEdit
 		m_pMaximumHeight->setCurrentIndex(iHeightIndex >= 0 ? iHeightIndex : m_pMaximumHeight->count() - 1);
 
 		m_pMipmaps->setChecked(m_pOptions->GenerateMipmaps != vlFalse);
-		m_pMipmapFilter->setCurrentIndex(m_pOptions->MipmapFilter == MIPMAP_FILTER_NICE ? 1 : 0);
+		setMipmapFilter(m_pMipmapFilter, m_pOptions->MipmapFilter);
 
 		const int iVersionIndex = m_pVersion->findText(m_pOptions->Version);
 		m_pVersion->setCurrentIndex(iVersionIndex >= 0 ? iVersionIndex : 2); // 7.4
@@ -556,13 +588,13 @@ namespace VTFEdit
 
 		m_pOptions->ResizeImage = m_pResize->isChecked() ? vlTrue : vlFalse;
 		m_pOptions->ResizeMethod = static_cast<VTFResizeMethod>(m_pResizeMethod->currentData().toInt());
-		m_pOptions->ResizeFilter = m_pResizeFilter->currentIndex() == 1 ? MIPMAP_FILTER_NICE : MIPMAP_FILTER_BOX;
+		m_pOptions->ResizeFilter = mipmapFilter(m_pResizeFilter);
 		m_pOptions->ResizeClamp = m_pResizeClamp->isChecked() ? vlTrue : vlFalse;
 		m_pOptions->ResizeClampWidth = m_pMaximumWidth->currentText().toUInt();
 		m_pOptions->ResizeClampHeight = m_pMaximumHeight->currentText().toUInt();
 
 		m_pOptions->GenerateMipmaps = m_pMipmaps->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->MipmapFilter = m_pMipmapFilter->currentIndex() == 1 ? MIPMAP_FILTER_NICE : MIPMAP_FILTER_BOX;
+		m_pOptions->MipmapFilter = mipmapFilter(m_pMipmapFilter);
 
 		m_pOptions->Version = m_pVersion->currentText();
 
