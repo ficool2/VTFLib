@@ -234,14 +234,14 @@ namespace VTFEdit
 		pFlagsGrid->setColumnStretch(1, 1);
 
 		m_pStripAlpha = new QCheckBox(tr("Strip alpha channel"), pGeneral);
-		m_pStripAlpha->setToolTip(tr("Discard the alpha channel of imported images. "
+		m_pStripAlpha->setToolTip(tr("Discard the alpha channel of imported images.\n"
 			"The colour format is always used when this is enabled."));
 		pGeneralForm->addRow(m_pStripAlpha);
 
 		m_pSrgb = new QCheckBox(tr("sRGB"), pGeneral);
-		m_pSrgb->setToolTip(tr("Marks the texture as storing standard image colours. "
-			"This affects how mipmaps and resizing filters are computed. "
-			"Leave this off for textures that store data rather than color, "
+		m_pSrgb->setToolTip(tr("Marks the texture as storing standard image colours.\n"
+			"This affects how mipmaps and resizing filters are computed.\n"
+			"Leave this off for textures that store data rather than color,\n"
 			"such as normal maps, masks, exponent maps and UI icons."));
 		pGeneralForm->addRow(m_pSrgb);
 
