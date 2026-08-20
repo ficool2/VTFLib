@@ -64,6 +64,7 @@ namespace VTFEdit
 		QCheckBox *m_pFlagClampT;
 		QCheckBox *m_pFlagNoLOD;
 		QCheckBox *m_pFlagPointSample;
+		QCheckBox *m_pSrgb;
 
 		QCheckBox *m_pResize;
 		QComboBox *m_pResizeMethod;
@@ -83,7 +84,6 @@ namespace VTFEdit
 		QCheckBox *m_pThumbnail;
 		QCheckBox *m_pSphereMap;
 		QCheckBox *m_pStripAlpha;
-		QCheckBox *m_pSrgb;
 
 		QCheckBox *m_pDistanceAlpha;
 		QDoubleSpinBox *m_pDistanceAlphaSpread;

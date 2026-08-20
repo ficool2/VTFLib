@@ -238,6 +238,13 @@ namespace VTFEdit
 			"The colour format is always used when this is enabled."));
 		pGeneralForm->addRow(m_pStripAlpha);
 
+		m_pSrgb = new QCheckBox(tr("sRGB"), pGeneral);
+		m_pSrgb->setToolTip(tr("Marks the texture as storing standard image colours. "
+			"This affects how mipmaps and resizing filters are computed. "
+			"Leave this off for textures that store data rather than color, "
+			"such as normal maps, masks, exponent maps and UI icons."));
+		pGeneralForm->addRow(m_pSrgb);
+
 		pGeneralForm->addRow(new QLabel(tr("Flags:"), pGeneral));
 		pGeneralForm->addRow(pFlags);
 
@@ -304,11 +311,9 @@ namespace VTFEdit
 		m_pReflectivity = new QCheckBox(tr("Compute reflectivity"), pMisc);
 		m_pThumbnail = new QCheckBox(tr("Generate thumbnail"), pMisc);
 		m_pSphereMap = new QCheckBox(tr("Generate sphere map"), pMisc);
-		m_pSrgb = new QCheckBox(tr("sRGB"), pMisc);
 		pMiscLayout->addWidget(m_pReflectivity);
 		pMiscLayout->addWidget(m_pThumbnail);
 		pMiscLayout->addWidget(m_pSphereMap);
-		pMiscLayout->addWidget(m_pSrgb);
 
 		QGroupBox *pDistanceAlpha = new QGroupBox(tr("Distance Alpha:"), pTab);
 		QFormLayout *pDistanceAlphaForm = new QFormLayout(pDistanceAlpha);
