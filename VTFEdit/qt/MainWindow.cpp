@@ -57,6 +57,7 @@
 #include <QMimeData>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QScreen>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSignalBlocker>
@@ -3409,6 +3410,55 @@ namespace VTFEdit
 		return true;
 	}
 
+	QRect MainWindow::sanitizeWindowGeometry(const QRect &Geometry) const
+	{
+		QRect Result = Geometry;
+
+		if(Result.width() < qMax(minimumWidth(), 320))
+			Result.setWidth(qMax(minimumWidth(), 1024));
+
+		if(Result.height() < qMax(minimumHeight(), 240))
+			Result.setHeight(qMax(minimumHeight(), 600));
+
+		const QScreen *pScreen = QGuiApplication::screenAt(Result.center());
+		if(pScreen == nullptr)
+		{
+			pScreen = QGuiApplication::screenAt(Result.topLeft());
+		}
+
+		if(pScreen == nullptr)
+		{
+			pScreen = QGuiApplication::primaryScreen();
+
+			if(pScreen == nullptr)
+			{
+				return Result;
+			}
+
+			const QRect Available = pScreen->availableGeometry();
+
+			Result.setSize(Result.size().boundedTo(Available.size()));
+			Result.moveCenter(Available.center());
+
+			return Result;
+		}
+
+		const QRect Available = pScreen->availableGeometry();
+
+		Result.setSize(Result.size().boundedTo(Available.size()));
+
+		if(Result.right() > Available.right())
+			Result.moveRight(Available.right());
+		if(Result.bottom() > Available.bottom())
+			Result.moveBottom(Available.bottom());
+		if(Result.left() < Available.left())
+			Result.moveLeft(Available.left());
+		if(Result.top() < Available.top())
+			Result.moveTop(Available.top());
+
+		return Result;
+	}
+
 	bool MainWindow::readConfigFile(const QString &sConfigFile)
 	{
 		QFile File(sConfigFile);
@@ -3626,8 +3676,10 @@ namespace VTFEdit
 
 		applyVmtEditorSettings();
 
-		resize(Size);
-		move(Location);
+		const QRect Geometry = sanitizeWindowGeometry(QRect(Location, Size));
+
+		resize(Geometry.size());
+		move(Geometry.topLeft());
 		if(bMaximized)
 		{
 			setWindowState(windowState() | Qt::WindowMaximized);

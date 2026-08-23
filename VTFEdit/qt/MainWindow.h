@@ -27,6 +27,7 @@
 #include <QImage>
 #include <QMainWindow>
 #include <QPoint>
+#include <QRect>
 #include <QStringList>
 
 #include <vector>
@@ -251,6 +252,7 @@ namespace VTFEdit
 		// Recent files and configuration.
 		void addRecentFile(const QString &sFileName);
 		void updateRecentFiles();
+		QRect sanitizeWindowGeometry(const QRect &Geometry) const;
 		bool readConfigFile(const QString &sConfigFile);
 		bool writeConfigFile(const QString &sConfigFile) const;
 
