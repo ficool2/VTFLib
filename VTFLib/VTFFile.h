@@ -335,6 +335,11 @@ namespace VTFLib
 
 		vlVoid ComputeResources();	 //!< Computes header VTF directory resources.
 
+		// Sorted insert of resources
+		static vlUInt GetResourceSortKey(vlUInt uiType);
+		static vlVoid SortResources(SVTFHeader &Header);
+		static vlUInt InsertResource(SVTFHeader &Header, vlUInt uiType);
+
 		// Interface with out reader/writer classes
 		vlBool Load(IO::Readers::IReader *Reader, vlBool bHeaderOnly);
 		vlBool Save(IO::Writers::IWriter *Writer) const;

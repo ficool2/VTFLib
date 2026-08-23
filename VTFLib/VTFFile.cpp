@@ -1490,6 +1490,9 @@ vlBool CVTFFile::Load(IO::Readers::IReader *Reader, vlBool bHeaderOnly)
 			this->SetResourceData(VTF_RSRC_AUX_COMPRESSION_INFO, 0, 0);
 		}
 
+		// Fixup order to be sorted
+		CVTFFile::SortResources(*this->Header);
+
 		// Fixup resource offsets for writing.
 		this->ComputeResources();
 	}
@@ -1544,11 +1547,9 @@ vlBool CVTFFile::Save(IO::Writers::IWriter *Writer) const
 					throw 0;
 				}
 
-				SaveHeader.Resources[SaveHeader.ResourceCount].Type = VTF_RSRC_AUX_COMPRESSION_INFO;
-				SaveHeader.Resources[SaveHeader.ResourceCount].Data = 0;
-				SaveHeader.Data[SaveHeader.ResourceCount].Size = this->uiAuxCompressionInfoSize;
-				SaveHeader.Data[SaveHeader.ResourceCount].Data = this->lpAuxCompressionInfo;
-				SaveHeader.ResourceCount++;
+				vlUInt uiAuxIndex = CVTFFile::InsertResource(SaveHeader, VTF_RSRC_AUX_COMPRESSION_INFO);
+				SaveHeader.Data[uiAuxIndex].Size = this->uiAuxCompressionInfoSize;
+				SaveHeader.Data[uiAuxIndex].Data = this->lpAuxCompressionInfo;
 
 				SaveHeader.HeaderSize = sizeof(SVTFHeader_76_A) + SaveHeader.ResourceCount * sizeof(SVTFResource);
 				uiImageBufferSize = this->uiAuxCompressedBufferSize;
@@ -1784,6 +1785,73 @@ vlBool CVTFFile::SetVersion(vlUInt uiMajor, vlUInt uiMinor)
 	this->ComputeResources();
 
 	return vlTrue;
+}
+
+//
+// GetResourceSortKey()
+// Returns the value the engine sorts and binary searches the resource dictionary on.
+//
+vlUInt CVTFFile::GetResourceSortKey(vlUInt uiType)
+{
+	return uiType & 0x00ffffff;
+}
+
+//
+// SortResources()
+// Sorts a resource dictionary by resource ID.
+//
+vlVoid CVTFFile::SortResources(SVTFHeader &Header)
+{
+	// insertion sort
+	for(vlUInt i = 1; i < Header.ResourceCount; i++)
+	{
+		SVTFResource Resource = Header.Resources[i];
+		SVTFResourceData Data = Header.Data[i];
+
+		vlUInt uiKey = CVTFFile::GetResourceSortKey(Resource.Type);
+
+		vlUInt j = i;
+		while(j > 0 && CVTFFile::GetResourceSortKey(Header.Resources[j - 1].Type) > uiKey)
+		{
+			Header.Resources[j] = Header.Resources[j - 1];
+			Header.Data[j] = Header.Data[j - 1];
+			j--;
+		}
+
+		Header.Resources[j] = Resource;
+		Header.Data[j] = Data;
+	}
+}
+
+//
+// InsertResource()
+// Inserts a resource of the given type into a dictionary in sorted order
+//
+vlUInt CVTFFile::InsertResource(SVTFHeader &Header, vlUInt uiType)
+{
+	vlUInt uiKey = CVTFFile::GetResourceSortKey(uiType);
+
+	vlUInt uiIndex = 0;
+	while(uiIndex < Header.ResourceCount && CVTFFile::GetResourceSortKey(Header.Resources[uiIndex].Type) < uiKey)
+	{
+		uiIndex++;
+	}
+
+	for(vlUInt i = Header.ResourceCount; i > uiIndex; i--)
+	{
+		Header.Resources[i] = Header.Resources[i - 1];
+		Header.Data[i] = Header.Data[i - 1];
+	}
+
+	Header.Resources[uiIndex].Type = uiType;
+	Header.Resources[uiIndex].Data = 0;
+
+	Header.Data[uiIndex].Size = 0;
+	Header.Data[uiIndex].Data = 0;
+
+	Header.ResourceCount++;
+
+	return uiIndex;
 }
 
 //
@@ -2464,21 +2532,18 @@ vlVoid *CVTFFile::SetResourceData(vlUInt uiType, vlUInt uiSize, vlVoid *lpData)
 						return 0;
 					}
 
-					vlUInt uiIndex = this->Header->ResourceCount;
-
-					this->Header->Resources[uiIndex].Type = uiType;
-					this->Header->Resources[uiIndex].Data = 0;
-
-					this->Header->Data[uiIndex].Size = 0;
-					this->Header->Data[uiIndex].Data = 0;
-
-					if(this->Header->Resources[uiIndex].Flags & RSRCF_HAS_NO_DATA_CHUNK)
+					vlBool bNoDataChunk = (uiType & (RSRCF_HAS_NO_DATA_CHUNK << 24)) != 0;
+					if(bNoDataChunk && uiSize != sizeof(vlUInt))
 					{
-						if(uiSize != sizeof(vlUInt))
-						{
-							LastError.Set("Resources with no data chunk must have size 4.");
-							return 0;
-						}
+						LastError.Set("Resources with no data chunk must have size 4.");
+						return 0;
+					}
+
+					// The engine binary searches the dictionary, so keep it sorted.
+					vlUInt uiIndex = CVTFFile::InsertResource(*this->Header, uiType);
+
+					if(bNoDataChunk)
+					{
 						if(lpData != 0)
 						{
 							this->Header->Resources[uiIndex].Data = *(vlUInt *)lpData;
@@ -2487,7 +2552,6 @@ vlVoid *CVTFFile::SetResourceData(vlUInt uiType, vlUInt uiSize, vlVoid *lpData)
 						{
 							this->Header->Resources[uiIndex].Data = 0;
 						}
-						this->Header->ResourceCount++;
 						this->ComputeResources();
 						return &this->Header->Resources[uiIndex].Data;
 					}
@@ -2503,7 +2567,6 @@ vlVoid *CVTFFile::SetResourceData(vlUInt uiType, vlUInt uiSize, vlVoid *lpData)
 						{
 							memset(this->Header->Data[uiIndex].Data, 0, this->Header->Data[uiIndex].Size);
 						}
-						this->Header->ResourceCount++;
 						this->ComputeResources();
 						return this->Header->Data[uiIndex].Data;
 					}
