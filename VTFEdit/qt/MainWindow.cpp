@@ -3728,11 +3728,14 @@ namespace VTFEdit
 			? QStringLiteral("Light") : m_VmtEditorSettings.eTheme == VmtEditorTheme::Dark
 			? QStringLiteral("Dark") : QStringLiteral("System")) << "\n";
 
+		const QPoint FrameOffset = geometry().topLeft() - frameGeometry().topLeft();
+		const QRect NormalGeometry = normalGeometry();
+
 		Stream << "\n[Forms]\n\n";
-		Stream << "Forms.VTFEdit.Location.X = " << normalGeometry().x() << "\n";
-		Stream << "Forms.VTFEdit.Location.Y = " << normalGeometry().y() << "\n";
-		Stream << "Forms.VTFEdit.Size.Width = " << normalGeometry().width() << "\n";
-		Stream << "Forms.VTFEdit.Size.Height = " << normalGeometry().height() << "\n";
+		Stream << "Forms.VTFEdit.Location.X = " << NormalGeometry.x() - FrameOffset.x() << "\n";
+		Stream << "Forms.VTFEdit.Location.Y = " << NormalGeometry.y() - FrameOffset.y() << "\n";
+		Stream << "Forms.VTFEdit.Size.Width = " << NormalGeometry.width() << "\n";
+		Stream << "Forms.VTFEdit.Size.Height = " << NormalGeometry.height() << "\n";
 		Stream << "Forms.VTFEdit.WindowState = " << (isMaximized() ? "Maximized" : "Normal") << "\n";
 		Stream << "Forms.VTFEdit.Sidebar.SplitPosition = " << iSidebarSplit << "\n";
 		Stream << "Forms.VTFEdit.SidebarRight.SplitPosition = " << iSidebarRightSplit << "\n";
