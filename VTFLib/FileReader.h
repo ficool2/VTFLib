@@ -24,7 +24,11 @@ namespace VTFLib
 			class CFileReader : public IReader
 			{
 			private:
+#ifdef _WIN32
 				HANDLE hFile;
+#else
+				FILE *hFile;
+#endif
 				vlChar *cFileName;
 
 			public:

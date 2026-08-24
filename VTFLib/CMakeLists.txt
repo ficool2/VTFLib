@@ -21,8 +21,11 @@ add_library(vtflib SHARED
 	VTFLib.cpp
 	VTFMathlib.cpp
 	VTFWrapper.cpp
-	Resource.rc
 )
+
+if(WIN32)
+	target_sources(vtflib PRIVATE Resource.rc)
+endif()
 
 set_target_properties(vtflib PROPERTIES
 	# Deliberately not "VTFLib"!
@@ -35,11 +38,17 @@ set_target_properties(vtflib PROPERTIES
 target_compile_definitions(vtflib
 	PRIVATE
 		VTFLIB_EXPORTS
-		_WINDOWS
-		_USRDLL
+		$<$<BOOL:${WIN32}>:_WINDOWS>
+		$<$<BOOL:${WIN32}>:_USRDLL>
 		_CRT_SECURE_NO_WARNINGS
 		_CRT_NONSTDC_NO_DEPRECATE
 		$<$<NOT:$<CONFIG:Debug>>:_USE_RTM_VERSION>
+)
+
+set_target_properties(vtflib PROPERTIES
+	C_VISIBILITY_PRESET hidden
+	CXX_VISIBILITY_PRESET hidden
+	VISIBILITY_INLINES_HIDDEN ON
 )
 
 target_include_directories(vtflib

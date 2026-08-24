@@ -24,7 +24,11 @@ namespace VTFLib
 			class CFileWriter : public IWriter
 			{
 			private:
+#ifdef _WIN32
 				HANDLE hFile;
+#else
+				FILE *hFile;
+#endif
 				vlChar *cFileName;
 
 			public:

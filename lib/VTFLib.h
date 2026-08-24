@@ -12,10 +12,18 @@
 #ifndef VTFLIB_H
 #define VTFLIB_H
 
-#ifdef VTFLIB_EXPORTS
-#define VTFLIB_API __declspec(dllexport)
+#ifdef _WIN32
+#	ifdef VTFLIB_EXPORTS
+#		define VTFLIB_API __declspec(dllexport)
+#	else
+#		define VTFLIB_API __declspec(dllimport)
+#	endif
 #else
-#define VTFLIB_API __declspec(dllimport)
+#	ifdef VTFLIB_EXPORTS
+#		define VTFLIB_API __attribute__((visibility("default")))
+#	else
+#		define VTFLIB_API
+#	endif
 #endif
 
 typedef unsigned char	vlBool;

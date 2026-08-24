@@ -26,6 +26,9 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+#include <algorithm>
+#include <cstring>
+
 using namespace VTFLib;
 
 // Class construction
@@ -712,8 +715,8 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 
 						for (vlUInt m = 1; m < this->Header->MipCount; m++)
 						{
-							vlUShort usWidth  = max(1u, this->Header->Width  >> m);
-							vlUShort usHeight = max(1u, this->Header->Height >> m);
+							vlUShort usWidth  = std::max<vlUInt>(1u, this->Header->Width  >> m);
+							vlUShort usHeight = std::max<vlUInt>(1u, this->Header->Height >> m);
 
 							vlBool bResized;
 							if(bFloatSource)
@@ -1192,22 +1195,30 @@ vlBool CVTFFile::IsLoaded() const
 
 vlBool CVTFFile::Load(const vlChar *cFileName, vlBool bHeaderOnly)
 {
-	return this->Load(&IO::Readers::CFileReader(cFileName), bHeaderOnly);
+	IO::Readers::CFileReader Stream(cFileName);
+
+	return this->Load(&Stream, bHeaderOnly);
 }
 
 vlBool CVTFFile::Load(const vlVoid *lpData, vlUInt uiBufferSize, vlBool bHeaderOnly)
 {
-	return this->Load(&IO::Readers::CMemoryReader(lpData, uiBufferSize), bHeaderOnly);
+	IO::Readers::CMemoryReader Stream(lpData, uiBufferSize);
+
+	return this->Load(&Stream, bHeaderOnly);
 }
 
 vlBool CVTFFile::Load(vlVoid *pUserData, vlBool bHeaderOnly)
 {
-	return this->Load(&IO::Readers::CProcReader(pUserData), bHeaderOnly);
+	IO::Readers::CProcReader Stream(pUserData);
+
+	return this->Load(&Stream, bHeaderOnly);
 }
 
 vlBool CVTFFile::Save(const vlChar *cFileName) const
 {
-	return this->Save(&IO::Writers::CFileWriter(cFileName));
+	IO::Writers::CFileWriter Stream(cFileName);
+
+	return this->Save(&Stream);
 }
 
 vlBool CVTFFile::Save(vlVoid *lpData, vlUInt uiBufferSize, vlUInt &uiSize) const
@@ -1225,7 +1236,9 @@ vlBool CVTFFile::Save(vlVoid *lpData, vlUInt uiBufferSize, vlUInt &uiSize) const
 
 vlBool CVTFFile::Save(vlVoid *pUserData) const
 {
-	return this->Save(&IO::Writers::CProcWriter(pUserData));
+	IO::Writers::CProcWriter Stream(pUserData);
+
+	return this->Save(&Stream);
 }
 
 // -----------------------------------------------------------------------------------
@@ -3895,7 +3908,7 @@ vlUInt16 FP16ToUnorm(vlUInt16 uiValue)
 	sValue *= sFP16HDRExposure;
 	sValue = Reinhard(sValue);
 	sValue *= 65535.0f;
-	sValue = min(max(sValue, 0.0f), 65535.0f);
+	sValue = std::min(std::max(sValue, 0.0f), 65535.0f);
 	return (vlUInt16) sValue;
 }
 
@@ -4418,7 +4431,7 @@ static vlBool ConvertFromRGBA32F(const vlSingle *lpSource, vlByte *lpDest, vlUIn
 				}
 
 				sValue = sValue * 255.0f + 0.5f;
-				sValue = min(max(sValue, 0.0f), 255.0f);
+				sValue = std::min(std::max(sValue, 0.0f), 255.0f);
 
 				Temp[i * 4 + j] = (vlByte)sValue;
 			}
@@ -4969,9 +4982,9 @@ vlVoid CVTFFile::ComputeImageReflectivityRGBA32F(vlSingle *lpImageDataRGBA32F, v
 		{
 			vlUInt uiIndex = (i + j * uiWidth) * 4;
 
-			sTempX += min(max(lpImageDataRGBA32F[uiIndex + 0], 0.0f), 1.0f);
-			sTempY += min(max(lpImageDataRGBA32F[uiIndex + 1], 0.0f), 1.0f);
-			sTempZ += min(max(lpImageDataRGBA32F[uiIndex + 2], 0.0f), 1.0f);
+			sTempX += std::min(std::max(lpImageDataRGBA32F[uiIndex + 0], 0.0f), 1.0f);
+			sTempY += std::min(std::max(lpImageDataRGBA32F[uiIndex + 1], 0.0f), 1.0f);
+			sTempZ += std::min(std::max(lpImageDataRGBA32F[uiIndex + 2], 0.0f), 1.0f);
 		}
 
 		sInverse = 1.0f / (vlSingle)uiWidth;

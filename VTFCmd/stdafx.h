@@ -29,15 +29,22 @@
 #	endif
 #endif
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>			// For FindFirstFile()
+#ifdef _WIN32
+#	define WIN32_LEAN_AND_MEAN
+#	include <windows.h>			// For FindFirstFile()
+#	include <malloc.h>
+#else
+#	include <strings.h>
+#	define stricmp	strcasecmp
+#	define strnicmp	strncasecmp
+#endif
 
-#include <malloc.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 
-#include "..\lib\VTFLib.h"
+#include "../lib/VTFLib.h"
 
 #ifndef VTFLIB_CMAKE_BUILD
 #	ifdef _DEBUG
@@ -55,7 +62,7 @@
 #	endif
 #endif
 
-#include "IL\il.h"
+#include "IL/il.h"
 #ifndef VTFLIB_CMAKE_BUILD
 #	pragma comment(lib, "DevIL.lib")
 #endif

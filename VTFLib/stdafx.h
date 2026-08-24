@@ -20,10 +20,20 @@
 #ifndef STDAFX_H
 #define STDAFX_H
 
-#ifdef VTFLIB_EXPORTS
-#	define VTFLIB_API __declspec(dllexport)
+#include <stdint.h>
+
+#ifdef _WIN32
+#	ifdef VTFLIB_EXPORTS
+#		define VTFLIB_API __declspec(dllexport)
+#	else
+#		define VTFLIB_API __declspec(dllimport)
+#	endif
 #else
-#	define VTFLIB_API __declspec(dllimport)
+#	ifdef VTFLIB_EXPORTS
+#		define VTFLIB_API __attribute__((visibility("default")))
+#	else
+#		define VTFLIB_API
+#	endif
 #endif
 
 // Custom data types
@@ -40,10 +50,10 @@ typedef float			vlSingle;			//!< Floating point number
 typedef double			vlDouble;			//!< Double number
 typedef void			vlVoid;				//!< Void value.
 
-typedef unsigned __int8		vlUInt8;
-typedef unsigned __int16	vlUInt16;
-typedef unsigned __int32	vlUInt32;
-typedef unsigned __int64	vlUInt64;
+typedef uint8_t				vlUInt8;
+typedef uint16_t			vlUInt16;
+typedef uint32_t			vlUInt32;
+typedef uint64_t			vlUInt64;
 
 typedef vlSingle		vlFloat;			//!< Floating point number (same as vlSingled).
 
@@ -59,15 +69,31 @@ typedef vlSingle		vlFloat;			//!< Floating point number (same as vlSingled).
 #	endif
 #endif
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#ifdef _WIN32
+#	define WIN32_LEAN_AND_MEAN
+#	define NOMINMAX
+#	include <windows.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 #include <math.h>
 #include <stdarg.h>
 
-#if _MSC_VER >= 1600 // Visual Studio 2010
+#ifndef _WIN32
+#	include <strings.h>
+#	define stricmp			strcasecmp
+#	define strnicmp			strncasecmp
+#	define _stricmp			strcasecmp
+#	define _strnicmp		strncasecmp
+
+#	define FILE_BEGIN		SEEK_SET
+#	define FILE_CURRENT		SEEK_CUR
+#	define FILE_END			SEEK_END
+#endif
+
+#if defined(__cplusplus) || (defined(_MSC_VER) && _MSC_VER >= 1600)
 #	define STATIC_ASSERT(condition, message) static_assert(condition, message)
 #else
 #	define STATIC_ASSERT(condition, message) typedef char __C_ASSERT__[(condition) ? 1 : -1]

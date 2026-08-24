@@ -258,6 +258,8 @@ VTFLIB_API vlVoid vlSetFloat(VTFLibOption Option, vlSingle sValue)
 	}
 }
 
+#ifdef _WIN32
+
 //
 // DllMain()
 // DLL entry point.
@@ -278,3 +280,15 @@ BOOL APIENTRY DllMain(HANDLE hModule, DWORD dwReason, LPVOID lpReserved)
 	}
     return TRUE;
 }
+
+#else
+
+//
+// Equivalent of above for Linux.
+//
+static void __attribute__((destructor)) VTFLibUnload()
+{
+	vlShutdown();
+}
+
+#endif

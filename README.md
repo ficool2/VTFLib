@@ -26,7 +26,9 @@ The repository contains the following folders:
 
 ## Building with CMake
 
-Windows only. Requires CMake 3.21+, a C++17 compiler and Qt 6.
+Requires CMake 3.21+ and a C++17 compiler. VTFLib++ and VTFCmd build on both Windows and Linux.
+
+VTFEdit++ additionally requires Qt 6 and is Windows only for now.
 
 All third party dependencies are built from source, so the submodules must be checked out first:
 
@@ -34,15 +36,24 @@ All third party dependencies are built from source, so the submodules must be ch
 git submodule update --init --recursive
 ```
 
+Windows:
+
 ```
 cmake -B build -DCMAKE_PREFIX_PATH=<path-to-Qt6> -A x64
 cmake --build build --config Release
 ```
 
+Linux:
+
+```
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+```
+
 Build options:
 
 * `VTFLIB_BUILD_VTFCMD` (default ON) - build VTFCmd
-* `VTFLIB_BUILD_VTFEDIT` (default ON) - build VTFEdit++
+* `VTFLIB_BUILD_VTFEDIT` (default ON for Windows) - build VTFEdit++
 
 Binaries are written to `build/bin`
 

@@ -5,15 +5,18 @@ project(VTFLib
 	LANGUAGES C CXX
 )
 
-if(NOT WIN32)
-	message(FATAL_ERROR "Only Windows is supported")
+# zstd ships hand-written x86-64 assembly for its decompressor
+if(NOT MSVC)
+	enable_language(ASM)
 endif()
+
+include(CMakeDependentOption)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(VTFLIB_BUILD_VTFCMD "Build VTFCmd" ON)
-option(VTFLIB_BUILD_VTFEDIT "Build VTFEdit" ON)
+cmake_dependent_option(VTFLIB_BUILD_VTFEDIT "Build VTFEdit" ON "WIN32" OFF)
 
 foreach(config "" _DEBUG _RELEASE _RELWITHDEBINFO _MINSIZEREL)
 	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY${config} "${CMAKE_BINARY_DIR}/bin")

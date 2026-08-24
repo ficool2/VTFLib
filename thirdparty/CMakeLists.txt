@@ -34,7 +34,12 @@ add_library(zlib_static STATIC
 	"${ZLIB_DIR}/zutil.c"
 )
 target_include_directories(zlib_static PUBLIC "${ZLIB_DIR}")
-target_compile_definitions(zlib_static PRIVATE _CRT_SECURE_NO_DEPRECATE _CRT_NONSTDC_NO_DEPRECATE)
+target_compile_definitions(zlib_static PRIVATE
+	_CRT_SECURE_NO_DEPRECATE
+	_CRT_NONSTDC_NO_DEPRECATE
+	# hack for <unistd.h>
+	$<$<NOT:$<BOOL:${WIN32}>>:Z_HAVE_UNISTD_H>
+)
 set_target_properties(zlib_static PROPERTIES
 	POSITION_INDEPENDENT_CODE ON
 	MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
@@ -179,6 +184,8 @@ set_target_properties(DevIL PROPERTIES
 
 if(MSVC)
 	target_compile_options(DevIL PRIVATE /wd4267 /wd4244 /wd4996)
+else()
+	target_compile_options(DevIL PRIVATE -w)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -200,6 +207,7 @@ add_library(miniz STATIC
 target_include_directories(miniz PUBLIC "${MINIZ_DIR}" "${MINIZ_CONF_DIR}")
 target_compile_definitions(miniz PRIVATE _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE)
 set_target_properties(miniz PROPERTIES
+	POSITION_INDEPENDENT_CODE ON
 	MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 	FOLDER thirdparty
 )
@@ -216,6 +224,10 @@ file(GLOB ZSTD_SOURCES
 	"${ZSTD_DIR}/decompress/*.c"
 )
 
+if(NOT MSVC)
+	list(APPEND ZSTD_SOURCES "${ZSTD_DIR}/decompress/huf_decompress_amd64.S")
+endif()
+
 add_library(zstd STATIC ${ZSTD_SOURCES})
 target_include_directories(zstd
 	PRIVATE "${ZSTD_DIR}/common"
@@ -228,6 +240,7 @@ target_compile_definitions(zstd
 		_CRT_SECURE_NO_WARNINGS
 )
 set_target_properties(zstd PROPERTIES
+	POSITION_INDEPENDENT_CODE ON
 	MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 	FOLDER thirdparty
 )
@@ -247,6 +260,7 @@ foreach(simd SSE AVX AVX512)
 		"${CMP_DIR}/cmp_core/shaders"
 	)
 	set_target_properties(CMP_Core_${simd} PROPERTIES
+		POSITION_INDEPENDENT_CODE ON
 		MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 		FOLDER thirdparty
 	)
@@ -255,6 +269,10 @@ endforeach()
 if(MSVC)
 	target_compile_options(CMP_Core_AVX PRIVATE /arch:AVX2)
 	target_compile_options(CMP_Core_AVX512 PRIVATE /arch:AVX512)
+else()
+	target_compile_options(CMP_Core_SSE PRIVATE -msse4.1)
+	target_compile_options(CMP_Core_AVX PRIVATE -mavx2 -mfma -mf16c)
+	target_compile_options(CMP_Core_AVX512 PRIVATE -mavx512f -mavx512bw -mavx512dq -mavx512vl)
 endif()
 
 add_library(CMP_Core STATIC
@@ -276,6 +294,7 @@ target_include_directories(CMP_Core PUBLIC
 )
 target_link_libraries(CMP_Core PRIVATE CMP_Core_SSE CMP_Core_AVX CMP_Core_AVX512)
 set_target_properties(CMP_Core PROPERTIES
+	POSITION_INDEPENDENT_CODE ON
 	MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 	FOLDER thirdparty
 )
@@ -337,6 +356,7 @@ target_include_directories(CMP_Compressonator PUBLIC
 target_link_libraries(CMP_Compressonator PUBLIC CMP_Core)
 
 set_target_properties(CMP_Compressonator PROPERTIES
+	POSITION_INDEPENDENT_CODE ON
 	MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 	FOLDER thirdparty
 )

@@ -19,6 +19,9 @@
 
 #include "stdafx.h"
 #include "enumerations.h"
+#include "platform.h"
+
+#include <ctype.h>
 
 #define MAX_ITEMS	1024
 
@@ -130,8 +133,7 @@ int main(int argc, char* argv[])
 
 	VTFMipmapFilter MipmapFilter;		// Temp variable for string to VTFMipmapFilter test.
 
-	WIN32_FIND_DATA FindData;
-	HANDLE Handle;
+	vlBool bDirectory;
 
 	// Check we have the right DLL version.
 	if(vlGetVersion() != VL_VERSION)
@@ -152,11 +154,9 @@ int main(int argc, char* argv[])
 		break;
 	case 2:
 		// If only one argument assume drag and drop.
-		Handle = FindFirstFile(argv[1], &FindData);
-
-		if(Handle != INVALID_HANDLE_VALUE)
+		if(PathInfo(argv[1], &bDirectory))
 		{
-			if(FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			if(bDirectory)
 			{
 				lpFolders[uiFolderCount++] = argv[1];
 				CreateOptions.bResize = vlTrue;
@@ -169,7 +169,6 @@ int main(int argc, char* argv[])
 				bPause = vlTrue;
 			}
 
-			FindClose(Handle);
 			break;
 		}
 		// Fall through.
@@ -669,20 +668,20 @@ int main(int argc, char* argv[])
 	for(i = 0; i < (int)uiFolderCount; i++)
 	{
 		// Grab the wildcard string from the folder path.
-		if((lpWildcard = strrchr(lpFolders[i], '\\')) == 0)
+		if((lpWildcard = strrchr(lpFolders[i], PATH_SEPARATOR)) == 0)
 		{
-			lpWildcard = "*.*";
+			lpWildcard = DEFAULT_WILDCARD;
 		}
 		else
 		{
-			// Wildcard starts after last \ in path.  e.g. C:\input\*.bmp
+			// Wildcard starts after last path separator.  e.g. C:\input\*.bmp
 			*lpWildcard = '\0';
 			lpWildcard++;
 
-			// If there is no wildcard after the last \, use *.* as defult.
+			// If there is no wildcard after the last separator, use the default.
 			if(*lpWildcard == '\0')
 			{
-				lpWildcard = "*.*";
+				lpWildcard = DEFAULT_WILDCARD;
 			}
 		}
 
@@ -851,13 +850,13 @@ void CreateOutputPath(vlChar *lpOutputFile, vlChar *lpInputFile, vlChar *lpExten
 	if(lpOutput != 0 && *lpOutput != '\0')
 	{
 		// Put the file in the lpOutput directory.
-		sprintf(lpOutputFile, "%s\\", lpOutput);
+		sprintf(lpOutputFile, "%s" PATH_SEPARATOR_STRING, lpOutput);
 	}
 	else
 	{
 		// Put the file in the same directory as the input file.
 		strcpy(lpOutputFile, lpInputFile);
-		if((lpTemp = strrchr(lpOutputFile, '\\')) != 0)
+		if((lpTemp = strrchr(lpOutputFile, PATH_SEPARATOR)) != 0)
 		{
 			*(lpTemp + 1) = '\0';
 		}
@@ -871,7 +870,7 @@ void CreateOutputPath(vlChar *lpOutputFile, vlChar *lpInputFile, vlChar *lpExten
 	strcat(lpOutputFile, lpPrefix);
 
 	// Add the file name of the input file to the file name.
-	if((lpTemp = strrchr(lpInputFile, '\\')) != 0)
+	if((lpTemp = strrchr(lpInputFile, PATH_SEPARATOR)) != 0)
 	{
 		strcat(lpOutputFile, lpTemp + 1);
 	}
@@ -880,7 +879,7 @@ void CreateOutputPath(vlChar *lpOutputFile, vlChar *lpInputFile, vlChar *lpExten
 		strcat(lpOutputFile, lpInputFile);
 	}
 
-	if((lpTemp = strrchr(lpOutputFile, '.')) != 0 && lpTemp > strrchr(lpOutputFile, '\\'))
+	if((lpTemp = strrchr(lpOutputFile, '.')) != 0 && lpTemp > strrchr(lpOutputFile, PATH_SEPARATOR))
 	{
 		*lpTemp = '\0';
 	}
@@ -1071,18 +1070,18 @@ void ProcessFile(vlChar *lpInputFile)
 			// We need to constuct a $basetexture string, to do this we need the path
 			// of the vtf file relative to the materials folder.  If we arn't in a
 			// materials folder we can't do this.
-			if((lpTemp = stristr(lpVTFFile, "materials\\")) == 0)
+			if((lpTemp = stristr(lpVTFFile, "materials" PATH_SEPARATOR_STRING)) == 0)
 			{
-				Print("  Error creating vmt: texture is not in a ...\\materials\\ folder.\n\n");
+				Print("  Error creating vmt: texture is not in a ..." PATH_SEPARATOR_STRING "materials" PATH_SEPARATOR_STRING " folder.\n\n");
 			}
 			else
 			{
 				strcpy(lpVMTFile, lpVTFFile);
 				strcpy(strrchr(lpVMTFile, '.'), ".vmt");
 
-				strcpy(lpVMTBaseTexture, lpTemp + strlen("materials\\"));
+				strcpy(lpVMTBaseTexture, lpTemp + strlen("materials" PATH_SEPARATOR_STRING));
 				*strrchr(lpVMTBaseTexture, '.') = '\0';
-				strrpl(lpVMTBaseTexture, '\\', '/');
+				strrpl(lpVMTBaseTexture, PATH_SEPARATOR, '/');
 
 				vlMaterialCreate(lpShader); // Create the root node.
 				vlMaterialGetFirstNode(); // Go to the root node.
@@ -1232,60 +1231,55 @@ void ProcessFile(vlChar *lpInputFile)
 //
 void ProcessFolder(vlChar *lpInputFolder, vlChar *lpWildcard)
 {
-	vlChar lpSearchString[512];
 	vlChar lpPath[512];
 
-	WIN32_FIND_DATA FindData;
-	HANDLE Handle;
+	SDirectoryEntry Entry;
+	SDirectorySearch *pSearch;
 
-	Print("Processing %s\\...\n\n", lpInputFolder);
+	Print("Processing %s" PATH_SEPARATOR_STRING "...\n\n", lpInputFolder);
 
 	if(bRecursive)
 	{
-		sprintf(lpSearchString, "%s\\*", lpInputFolder);
+		pSearch = DirectoryOpen(lpInputFolder, "*");
 
-		Handle = FindFirstFile(lpSearchString, &FindData);
-
-		if(Handle != INVALID_HANDLE_VALUE)
+		if(pSearch != 0)
 		{
-			do
+			while(DirectoryNext(pSearch, &Entry))
 			{
-				if(stricmp(FindData.cFileName, ".") != 0 && stricmp(FindData.cFileName, "..") != 0)
+				if(strcmp(Entry.cFileName, ".") != 0 && strcmp(Entry.cFileName, "..") != 0)
 				{
-					sprintf(lpPath, "%s\\%s", lpInputFolder, FindData.cFileName);
+					sprintf(lpPath, "%s" PATH_SEPARATOR_STRING "%s", lpInputFolder, Entry.cFileName);
 
-					if(FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+					if(Entry.bDirectory)
 					{
 						ProcessFolder(lpPath, lpWildcard);
 					}
 				}
-			} while(FindNextFile(Handle, &FindData));
+			}
 
-			FindClose(Handle);
+			DirectoryClose(pSearch);
 		}
 	}
 
-	sprintf(lpSearchString, "%s\\%s", lpInputFolder, lpWildcard);
+	pSearch = DirectoryOpen(lpInputFolder, lpWildcard);
 
-	Handle = FindFirstFile(lpSearchString, &FindData);
-
-	if(Handle != INVALID_HANDLE_VALUE)
+	if(pSearch != 0)
 	{
-		do
+		while(DirectoryNext(pSearch, &Entry))
 		{
-			if(stricmp(FindData.cFileName, ".") != 0 && stricmp(FindData.cFileName, "..") != 0)
+			if(strcmp(Entry.cFileName, ".") != 0 && strcmp(Entry.cFileName, "..") != 0)
 			{
-				sprintf(lpPath, "%s\\%s", lpInputFolder, FindData.cFileName);
+				sprintf(lpPath, "%s" PATH_SEPARATOR_STRING "%s", lpInputFolder, Entry.cFileName);
 
-				if((FindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+				if(!Entry.bDirectory)
 				{
 					ProcessFile(lpPath);
 				}
 			}
-		} while(FindNextFile(Handle, &FindData));
+		}
 
-		FindClose(Handle);
+		DirectoryClose(pSearch);
 	}
 
-	Print("%s\\ processed.\n\n", lpInputFolder);
+	Print("%s" PATH_SEPARATOR_STRING " processed.\n\n", lpInputFolder);
 }
