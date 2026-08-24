@@ -22,7 +22,9 @@
 
 #include <stdint.h>
 
-#ifdef _WIN32
+#ifdef VTFLIB_STATIC
+#	define VTFLIB_API
+#elif defined(_WIN32)
 #	ifdef VTFLIB_EXPORTS
 #		define VTFLIB_API __declspec(dllexport)
 #	else

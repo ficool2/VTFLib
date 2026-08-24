@@ -258,6 +258,8 @@ VTFLIB_API vlVoid vlSetFloat(VTFLibOption Option, vlSingle sValue)
 	}
 }
 
+#ifndef VTFLIB_STATIC
+
 #ifdef _WIN32
 
 //
@@ -290,5 +292,7 @@ static void __attribute__((destructor)) VTFLibUnload()
 {
 	vlShutdown();
 }
+
+#endif
 
 #endif
