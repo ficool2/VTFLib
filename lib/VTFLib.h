@@ -938,6 +938,8 @@ namespace VTFLib
 	
 	public:
 		static SVTFImageFormatInfo const &GetImageFormatInfo(VTFImageFormat ImageFormat);
+		
+		static vlBool IsHeaderValid(const SVTFHeader &Header);
 
 		static vlUInt ComputeImageSize(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDepth, VTFImageFormat ImageFormat);
 		static vlUInt ComputeImageSize(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDepth, vlUInt uiMipmaps, VTFImageFormat ImageFormat);

@@ -659,6 +659,15 @@ namespace VTFLib
 			\param ImageFormat is the storage format of the image data.
 			\return size of the image data in bytes.
 		*/
+		//! Sanity check a header read from a file.
+		/*!
+			Returns whether the header's dimensions, formats, counts are usable for computing buffer sizes and file offsets.
+
+			\param Header is the header to check.
+			\return vlTrue if the header is usable.
+		*/
+		static vlBool IsHeaderValid(const SVTFHeader &Header);
+
 		static vlUInt ComputeImageSize(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDepth, VTFImageFormat ImageFormat);
 
 		//! Calculate data buffer size for an image with MIP maps

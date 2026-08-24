@@ -871,7 +871,11 @@ vlVoid CVTFFile::Destroy()
 {
 	if(this->Header != 0)
 	{
-		for(vlUInt i = 0; i < this->Header->ResourceCount; i++)
+		vlUInt uiResourceCount = this->Header->ResourceCount;
+		if(uiResourceCount > VTF_RSRC_MAX_DICTIONARY_ENTRIES)
+			uiResourceCount = VTF_RSRC_MAX_DICTIONARY_ENTRIES;
+
+		for(vlUInt i = 0; i < uiResourceCount; i++)
 		{
 			delete []this->Header->Data[i].Data;
 		}
@@ -1241,6 +1245,101 @@ vlBool CVTFFile::Save(vlVoid *pUserData) const
 	return this->Save(&Stream);
 }
 
+//
+// IsHeaderValid()
+//
+vlBool CVTFFile::IsHeaderValid(const SVTFHeader &Header)
+{
+	if(Header.ResourceCount > VTF_RSRC_MAX_DICTIONARY_ENTRIES)
+	{
+		LastError.SetFormatted("File may be corrupt; directory length %u exceeds maximum dictionary length of %u.",
+			Header.ResourceCount, (vlUInt)VTF_RSRC_MAX_DICTIONARY_ENTRIES);
+		return vlFalse;
+	}
+
+	vlInt iImageFormat, iLowResImageFormat;
+	memcpy(&iImageFormat, &Header.ImageFormat, sizeof(vlInt));
+	memcpy(&iLowResImageFormat, &Header.LowResImageFormat, sizeof(vlInt));
+
+	if(iImageFormat != (vlInt)IMAGE_FORMAT_NONE &&
+	   (iImageFormat < 0 || iImageFormat >= (vlInt)IMAGE_FORMAT_COUNT))
+	{
+		LastError.SetFormatted("File may be corrupt; image format %d is not a known format.",
+			iImageFormat);
+		return vlFalse;
+	}
+
+	if(iLowResImageFormat != (vlInt)IMAGE_FORMAT_NONE &&
+	   (iLowResImageFormat < 0 || iLowResImageFormat >= (vlInt)IMAGE_FORMAT_COUNT))
+	{
+		LastError.SetFormatted("File may be corrupt; low resolution image format %d is not a known format.", 
+			iLowResImageFormat);
+		return vlFalse;
+	}
+
+	if(iImageFormat != (vlInt)IMAGE_FORMAT_NONE)
+	{
+		if(Header.Width == 0 || Header.Height == 0 || Header.Depth == 0)
+		{
+			LastError.SetFormatted("File may be corrupt; image dimensions %u x %u x %u contain a zero.",
+				(vlUInt)Header.Width, (vlUInt)Header.Height, (vlUInt)Header.Depth);
+			return vlFalse;
+		}
+
+		if(Header.MipCount == 0)
+		{
+			LastError.Set("File may be corrupt; image has no mip levels.");
+			return vlFalse;
+		}
+	}
+
+	if(iLowResImageFormat != (vlInt)IMAGE_FORMAT_NONE &&
+	   (Header.LowResImageWidth == 0 || Header.LowResImageHeight == 0))
+	{
+		LastError.SetFormatted("File may be corrupt; low resolution image dimensions %u x %u contain a zero.",
+			(vlUInt)Header.LowResImageWidth, (vlUInt)Header.LowResImageHeight);
+		return vlFalse;
+	}
+
+	if(Header.Frames == 0)
+	{
+		LastError.Set("File may be corrupt; image has no frames.");
+		return vlFalse;
+	}
+
+	if(iImageFormat != (vlInt)IMAGE_FORMAT_NONE)
+	{
+		vlUInt uiFaces = Header.Flags & TEXTUREFLAGS_ENVMAP ? CUBEMAP_FACE_COUNT : 1;
+		vlUInt64 uiTotal = 0;
+
+		vlUInt uiWidth = Header.Width, uiHeight = Header.Height, uiDepth = Header.Depth;
+		for(vlUInt i = 0; i < Header.MipCount; i++)
+		{
+			uiTotal += (vlUInt64)CVTFFile::ComputeImageSize(uiWidth, uiHeight, uiDepth, Header.ImageFormat);
+
+			uiWidth = uiWidth > 1 ? uiWidth >> 1 : 1;
+			uiHeight = uiHeight > 1 ? uiHeight >> 1 : 1;
+			uiDepth = uiDepth > 1 ? uiDepth >> 1 : 1;
+		}
+
+		uiTotal *= (vlUInt64)uiFaces * (vlUInt64)Header.Frames;
+
+		if(uiTotal > (vlUInt64)0xffffffffu)
+		{
+			LastError.Set("File may be corrupt; image data size overflows.");
+			return vlFalse;
+		}
+
+		if(uiTotal == 0)
+		{
+			LastError.SetFormatted("File may be corrupt; image format %d has no image data.", iImageFormat);
+			return vlFalse;
+		}
+	}
+
+	return vlTrue;
+}
+
 // -----------------------------------------------------------------------------------
 // vlBool Load(IO::Readers::IReader *Reader, vlBool bHeaderOnly)
 //
@@ -1288,9 +1387,16 @@ vlBool CVTFFile::Load(IO::Readers::IReader *Reader, vlBool bHeaderOnly)
 			throw 0;
 		}
 
-		if(FileHeader.HeaderSize > sizeof(SVTFHeader))
+		if(FileHeader.HeaderSize < sizeof(SVTFFileHeader))
 		{
-			LastError.SetFormatted("File header size %d B is larger than the %d B maximum expected.", FileHeader.HeaderSize, sizeof(SVTFHeader));
+			LastError.SetFormatted("File header size %u B is smaller than the %u B minimum expected.", FileHeader.HeaderSize, (vlUInt)sizeof(SVTFFileHeader));
+			throw 0;
+		}
+
+		vlUInt uiMaxHeaderSize = (vlUInt)(sizeof(SVTFHeader_76_A) + VTF_RSRC_MAX_DICTIONARY_ENTRIES * sizeof(SVTFResource));
+		if(FileHeader.HeaderSize > uiMaxHeaderSize)
+		{
+			LastError.SetFormatted("File header size %u B is larger than the %u B maximum expected.", FileHeader.HeaderSize, uiMaxHeaderSize);
 			throw 0;
 		}
 
@@ -1305,6 +1411,8 @@ vlBool CVTFFile::Load(IO::Readers::IReader *Reader, vlBool bHeaderOnly)
 			throw 0;
 		}
 
+		memset(this->Header->Data, 0, sizeof(this->Header->Data));
+
 		if(this->Header->Version[0] < VTF_MAJOR_VERSION || (this->Header->Version[0] == VTF_MAJOR_VERSION && this->Header->Version[1] < VTF_MINOR_VERSION_MIN_VOLUME))
 		{
 			// set depth if version is lower than 7.2
@@ -1315,6 +1423,12 @@ vlBool CVTFFile::Load(IO::Readers::IReader *Reader, vlBool bHeaderOnly)
 		{
 			// set resource count if version is lower than 7.3
 			this->Header->ResourceCount = 0;
+		}
+
+		// Everything past this point sizes buffers and computes offsets.. sanity check it!!
+		if(!CVTFFile::IsHeaderValid(*this->Header))
+		{
+			throw 0;
 		}
 
 		// if we just want the header loaded, bail here
@@ -1636,17 +1750,23 @@ vlBool CVTFFile::Save(IO::Writers::IWriter *Writer) const
 				switch(SaveHeader.Resources[i].Type)
 				{
 				case VTF_LEGACY_RSRC_LOW_RES_IMAGE:
-					if(Writer->Write(this->lpThumbnailImageData, this->uiThumbnailBufferSize) != this->uiThumbnailBufferSize)
+					if(this->lpThumbnailImageData != 0 && this->uiThumbnailBufferSize != 0)
 					{
-						throw 0;
+						if(Writer->Write(this->lpThumbnailImageData, this->uiThumbnailBufferSize) != this->uiThumbnailBufferSize)
+						{
+							throw 0;
+						}
 					}
 					break;
 				case VTF_LEGACY_RSRC_IMAGE:
 					{
 						vlByte *lpData = bAuxCompressed ? this->lpAuxCompressedData : this->lpImageData;
-						if(Writer->Write(lpData, uiImageBufferSize) != uiImageBufferSize)
+						if(lpData != 0 && uiImageBufferSize != 0)
 						{
-							throw 0;
+							if(Writer->Write(lpData, uiImageBufferSize) != uiImageBufferSize)
+							{
+								throw 0;
+							}
 						}
 					}
 					break;
@@ -1658,7 +1778,8 @@ vlBool CVTFFile::Save(IO::Writers::IWriter *Writer) const
 							throw 0;
 						}
 
-						if(Writer->Write(SaveHeader.Data[i].Data, SaveHeader.Data[i].Size) != SaveHeader.Data[i].Size)
+						if(SaveHeader.Data[i].Data != 0 && SaveHeader.Data[i].Size != 0 &&
+						   Writer->Write(SaveHeader.Data[i].Data, SaveHeader.Data[i].Size) != SaveHeader.Data[i].Size)
 						{
 							throw 0;
 						}
@@ -2312,6 +2433,9 @@ vlByte *CVTFFile::GetData(vlUInt uiFrame, vlUInt uiFace, vlUInt uiSlice, vlUInt 
 	if(!this->IsLoaded())
 		return 0;
 
+	if (this->lpImageData == 0 || this->uiImageBufferSize == 0 || this->Header->ImageFormat == IMAGE_FORMAT_NONE)
+		return 0;
+
 	return this->lpImageData + this->ComputeDataOffset(uiFrame, uiFace, uiSlice, uiMipmapLevel, this->Header->ImageFormat);
 }
 
@@ -2322,7 +2446,7 @@ vlByte *CVTFFile::GetData(vlUInt uiFrame, vlUInt uiFace, vlUInt uiSlice, vlUInt 
 //
 vlVoid CVTFFile::SetData(vlUInt uiFrame, vlUInt uiFace, vlUInt uiSlice, vlUInt uiMipmapLevel, vlByte *lpData)
 {
-	if(!this->IsLoaded() || this->lpImageData == 0)
+	if(!this->IsLoaded() || this->lpImageData == 0 || this->Header->ImageFormat == IMAGE_FORMAT_NONE)
 		return;
 
 	memcpy(this->lpImageData + this->ComputeDataOffset(uiFrame, uiFace, uiSlice, uiMipmapLevel, this->Header->ImageFormat), lpData, CVTFFile::ComputeMipmapSize(this->Header->Width, this->Header->Height, 1, uiMipmapLevel, this->Header->ImageFormat));
@@ -3328,6 +3452,7 @@ vlBool CVTFFile::ComputeReflectivity()
 // Array which holds information about our image format
 // (taken from imageloader.cpp, Valve Source SDK)
 //------------------------------------------------------
+static SVTFImageFormatInfo VTFImageFormatInfoUnknown = { "Unknown", 0, 0, 0, 0, 0, 0, vlFalse, vlFalse };
 static SVTFImageFormatInfo VTFImageFormatInfo[] =
 {
 	{ "RGBA8888",			 32,  4,  8,  8,  8,  8, vlFalse,  vlTrue },		// IMAGE_FORMAT_RGBA8888,
@@ -3425,9 +3550,14 @@ static SVTFImageFormatInfo VTFImageFormatInfo[] =
 
 SVTFImageFormatInfo const &CVTFFile::GetImageFormatInfo(VTFImageFormat ImageFormat)
 {
-	assert(ImageFormat >= 0 && ImageFormat < IMAGE_FORMAT_COUNT);
-
-	return VTFImageFormatInfo[ImageFormat];
+	if(ImageFormat >= 0 || ImageFormat < IMAGE_FORMAT_COUNT)
+	{
+		return VTFImageFormatInfo[ImageFormat];
+	}
+	else
+	{
+		return VTFImageFormatInfoUnknown;
+	}
 }
 
 //------------------------------------------------------------------------------------
@@ -3477,6 +3607,9 @@ vlUInt CVTFFile::ComputeImageSize(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDept
 //
 vlUInt CVTFFile::ComputeImageSize(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDepth, vlUInt uiMipmaps, VTFImageFormat ImageFormat)
 {
+	if(ImageFormat == IMAGE_FORMAT_NONE)
+		return 0;
+
 	vlUInt uiImageSize = 0;
 
 	assert(uiWidth != 0 && uiHeight != 0 && uiDepth != 0);
@@ -3544,6 +3677,13 @@ vlUInt CVTFFile::ComputeMipmapCount(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDe
 //-----------------------------------------------------------------------------
 vlVoid CVTFFile::ComputeMipmapDimensions(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDepth, vlUInt uiMipmapLevel, vlUInt &uiMipmapWidth, vlUInt &uiMipmapHeight, vlUInt &uiMipmapDepth)
 {
+	// don't shift more than the type bits (undefined)
+	if(uiMipmapLevel >= sizeof(vlUInt) * 8)
+	{
+		uiMipmapWidth = uiMipmapHeight = uiMipmapDepth = 1;
+		return;
+	}
+
 	// work out the width/height by taking the orignal dimension
 	// and bit shifting them down uiMipmapLevel times
 	uiMipmapWidth = uiWidth >> uiMipmapLevel;
@@ -4030,6 +4170,21 @@ static SVTFImageConvertInfo VTFImageConvertInfo[] =
 	{	  4,  0,  0,  0,  0,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC4}
 };
 
+// Mask for a channel of uiBitsPerPixel bits
+template<typename T>
+static T GetChannelMask(vlUInt uiBitsPerPixel)
+{
+	const vlUInt uiTypeBits = (vlUInt)(sizeof(T) * 8);
+
+	if(uiBitsPerPixel == 0)
+		return (T)0;
+
+	if(uiBitsPerPixel >= uiTypeBits)
+		return (T)(~0);
+
+	return (T)((T)(~0) >> (uiTypeBits - uiBitsPerPixel));
+}
+
 // Get each channels shift and mask (for encoding and decoding).
 template<typename T>
 vlVoid GetShiftAndMask(const SVTFImageConvertInfo& Info, T &uiRShift, T &uiGShift, T &uiBShift, T &uiAShift, T &uiRMask, T &uiGMask, T &uiBMask, T &uiAMask)
@@ -4045,7 +4200,7 @@ vlVoid GetShiftAndMask(const SVTFImageConvertInfo& Info, T &uiRShift, T &uiGShif
 		if(Info.iA >= 0 && Info.iA < Info.iR)
 			uiRShift += (T)Info.uiABitsPerPixel;
 
-		uiRMask = (T)(~0) >> (T)((sizeof(T) * 8) - Info.uiRBitsPerPixel); // Mask is for down shifted values.
+		uiRMask = GetChannelMask<T>(Info.uiRBitsPerPixel); // Mask is for down shifted values.
 	}
 
 	if(Info.iG >= 0)
@@ -4059,7 +4214,7 @@ vlVoid GetShiftAndMask(const SVTFImageConvertInfo& Info, T &uiRShift, T &uiGShif
 		if(Info.iA >= 0 && Info.iA < Info.iG)
 			uiGShift += (T)Info.uiABitsPerPixel;
 
-		uiGMask = (T)(~0) >> (T)((sizeof(T) * 8) - Info.uiGBitsPerPixel);
+		uiGMask = GetChannelMask<T>(Info.uiGBitsPerPixel);
 	}
 
 	if(Info.iB >= 0)
@@ -4073,7 +4228,7 @@ vlVoid GetShiftAndMask(const SVTFImageConvertInfo& Info, T &uiRShift, T &uiGShif
 		if(Info.iA >= 0 && Info.iA < Info.iB)
 			uiBShift += (T)Info.uiABitsPerPixel;
 
-		uiBMask = (T)(~0) >> (T)((sizeof(T) * 8) - Info.uiBBitsPerPixel);
+		uiBMask = GetChannelMask<T>(Info.uiBBitsPerPixel);
 	}
 
 	if(Info.iA >= 0)
@@ -4087,7 +4242,7 @@ vlVoid GetShiftAndMask(const SVTFImageConvertInfo& Info, T &uiRShift, T &uiGShif
 		if(Info.iB >= 0 && Info.iB < Info.iA)
 			uiAShift += (T)Info.uiBBitsPerPixel;
 
-		uiAMask = (T)(~0) >> (T)((sizeof(T) * 8) - Info.uiABitsPerPixel);
+		uiAMask = GetChannelMask<T>(Info.uiABitsPerPixel);
 	}
 }
 
