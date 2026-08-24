@@ -16,6 +16,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(VTFLIB_BUILD_VTFCMD "Build VTFCmd" ON)
+option(VTFLIB_BUILD_FUZZER "Build VTFFuzzer" OFF)
 cmake_dependent_option(VTFLIB_BUILD_VTFEDIT "Build VTFEdit" ON "WIN32" OFF)
 
 foreach(config "" _DEBUG _RELEASE _RELWITHDEBINFO _MINSIZEREL)
@@ -35,4 +36,8 @@ endif()
 
 if(VTFLIB_BUILD_VTFEDIT)
 	add_subdirectory(VTFEdit)
+endif()
+
+if(VTFLIB_BUILD_FUZZER)
+	add_subdirectory(fuzz)
 endif()

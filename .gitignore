@@ -333,3 +333,8 @@ ASALocalRun/
 build/
 out/
 CMakeUserPresets.json
+
+# Fuzzer build/working directories
+/fuzz/build/
+/fuzz/cm/
+fuzz-out/
