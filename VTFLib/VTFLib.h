@@ -139,8 +139,8 @@ namespace VTFLib
 	extern vlUInt uiVMTParseMode;
 }
 
-#define VL_VERSION			222			//!< VTFLib version as integer
-#define VL_VERSION_STRING	"2.2.2"		//!< VTFLib version as string
+#define VL_VERSION			223			//!< VTFLib version as integer
+#define VL_VERSION_STRING	"2.2.3"		//!< VTFLib version as string
 
 #ifdef __cplusplus
 extern "C" {
