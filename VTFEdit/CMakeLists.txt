@@ -2,7 +2,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Widgets Network)
 
 qt_standard_project_setup()
 
-qt_add_executable(vtfedit WIN32
+qt_add_executable(vtfedit
 	qt/main.cpp
 	qt/MainWindow.cpp
 	qt/MainWindow.h
