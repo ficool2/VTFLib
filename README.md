@@ -34,18 +34,11 @@ All third party dependencies are built from source, so the submodules must be ch
 git submodule update --init --recursive
 ```
 
-Windows:
+Then build:
 
 ```
 cmake -B build -DCMAKE_PREFIX_PATH=<path-to-Qt6> -A x64
 cmake --build build --config Release
-```
-
-Linux:
-
-```
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
 ```
 
 Build options:
