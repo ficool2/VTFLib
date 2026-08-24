@@ -3550,7 +3550,7 @@ static SVTFImageFormatInfo VTFImageFormatInfo[] =
 
 SVTFImageFormatInfo const &CVTFFile::GetImageFormatInfo(VTFImageFormat ImageFormat)
 {
-	if(ImageFormat >= 0 || ImageFormat < IMAGE_FORMAT_COUNT)
+	if(ImageFormat >= 0 && ImageFormat < IMAGE_FORMAT_COUNT)
 	{
 		return VTFImageFormatInfo[ImageFormat];
 	}
