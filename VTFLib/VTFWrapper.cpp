@@ -125,6 +125,7 @@ VTFLIB_API vlVoid vlImageCreateDefaultCreateStructure(SVTFCreateOptions *VTFCrea
 	VTFCreateOptions->bResizeClamp = vlTrue;
 	VTFCreateOptions->uiResizeClampWidth = 4096;
 	VTFCreateOptions->uiResizeClampHeight = 4096;
+	VTFCreateOptions->bResizeClampAspect = vlFalse;
 
 	VTFCreateOptions->bThumbnail = vlTrue;
 	VTFCreateOptions->bReflectivity = vlTrue;

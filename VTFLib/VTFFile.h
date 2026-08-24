@@ -83,6 +83,7 @@ typedef struct tagSVTFCreateOptions
 	vlBool bResizeClamp;								//!< Clamp re-size size.
 	vlUInt uiResizeClampWidth;							//!< Maximum width to re-size to.
 	vlUInt uiResizeClampHeight;							//!< Maximum height to re-size to.
+	vlBool bResizeClampAspect;							//!< Preserve the aspect ratio when clamping the re-size.
 
 	vlBool bGammaCorrection;							//!< Gamma correct input image.
 	vlSingle sGammaCorrection;							//!< Gamma correction to apply.

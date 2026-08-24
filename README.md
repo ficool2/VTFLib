@@ -69,6 +69,7 @@ Correct vtfcmd usage:
  -rheight <integer>       (Resize to specific height.)
  -rclampwidth <integer>   (Maximum width to resize to.)
  -rclampheight <integer>  (Maximum height to resize to.)
+ -rkeepaspect             (Preserve aspect ratio when clamping; scales both dimensions.)
  -gamma                   (Gamma correct image.)
  -gcorrection <single>    (Gamma correction to use.)
  -distancealpha           (Encode the alpha channel as a distance field.)

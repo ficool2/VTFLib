@@ -553,15 +553,48 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 			case RESIZE_BIGGEST_MULTIPLE4:
 			case RESIZE_SMALLEST_MULTIPLE4:
 				uiNewWidth = this->ComputeResizedDimension(uiWidth, VTFCreateOptions.ResizeMethod);
-				if(VTFCreateOptions.bResizeClamp && uiNewWidth > VTFCreateOptions.uiResizeClampWidth)
-				{
-					uiNewWidth = VTFCreateOptions.uiResizeClampWidth;
-				}
-
 				uiNewHeight = this->ComputeResizedDimension(uiHeight, VTFCreateOptions.ResizeMethod);
-				if(VTFCreateOptions.bResizeClamp && uiNewHeight > VTFCreateOptions.uiResizeClampHeight)
+
+				if(VTFCreateOptions.bResizeClamp)
 				{
-					uiNewHeight = VTFCreateOptions.uiResizeClampHeight;
+					if(VTFCreateOptions.bResizeClampAspect)
+					{
+						// Halve both dimensions together so the aspect ratio is preserved.
+						while((uiNewWidth > VTFCreateOptions.uiResizeClampWidth && uiNewWidth > 1) ||
+							  (uiNewHeight > VTFCreateOptions.uiResizeClampHeight && uiNewHeight > 1))
+						{
+							if(uiNewWidth > 1)
+							{
+								uiNewWidth /= 2;
+							}
+
+							if(uiNewHeight > 1)
+							{
+								uiNewHeight /= 2;
+							}
+						}
+
+						if(VTFCreateOptions.ResizeMethod == RESIZE_NEAREST_MULTIPLE4 ||
+						   VTFCreateOptions.ResizeMethod == RESIZE_BIGGEST_MULTIPLE4 ||
+						   VTFCreateOptions.ResizeMethod == RESIZE_SMALLEST_MULTIPLE4)
+						{
+							// Halving can break the multiple of four alignment; round back down.
+							uiNewWidth = uiNewWidth < 4 ? 4 : uiNewWidth - (uiNewWidth % 4);
+							uiNewHeight = uiNewHeight < 4 ? 4 : uiNewHeight - (uiNewHeight % 4);
+						}
+					}
+					else
+					{
+						if(uiNewWidth > VTFCreateOptions.uiResizeClampWidth)
+						{
+							uiNewWidth = VTFCreateOptions.uiResizeClampWidth;
+						}
+
+						if(uiNewHeight > VTFCreateOptions.uiResizeClampHeight)
+						{
+							uiNewHeight = VTFCreateOptions.uiResizeClampHeight;
+						}
+					}
 				}
 				break;
 			case RESIZE_SET:

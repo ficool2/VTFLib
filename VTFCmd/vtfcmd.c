@@ -470,6 +470,10 @@ int main(int argc, char* argv[])
 					return 2;
 				}
 			}
+			else if(stricmp(argv[i], "-rkeepaspect") == 0)
+			{
+				CreateOptions.bResizeClampAspect = vlTrue;
+			}
 			else if(stricmp(argv[i], "-gamma") == 0)
 			{
 				CreateOptions.bGammaCorrection = vlTrue;
@@ -762,6 +766,7 @@ void PrintUsage(const vlChar *lpError, ...)
 	Print(" -rheight <integer>       (Resize to specific height.)\n");
 	Print(" -rclampwidth <integer>   (Maximum width to resize to.)\n");
 	Print(" -rclampheight <integer>  (Maximum height to resize to.)\n");
+	Print(" -rkeepaspect             (Preserve aspect ratio when clamping; scales both dimensions.)\n");
 	Print(" -gamma                   (Gamma correct image.)\n");
 	Print(" -gcorrection <single>    (Gamma correction to use.)\n");
 	Print(" -distancealpha           (Encode the alpha channel as a distance field.)\n");
