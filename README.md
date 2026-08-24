@@ -26,9 +26,7 @@ The repository contains the following folders:
 
 ## Building with CMake
 
-Requires CMake 3.21+ and a C++17 compiler. VTFLib++ and VTFCmd build on both Windows and Linux.
-
-VTFEdit++ additionally requires Qt 6 and is Windows only for now.
+Requires CMake 3.21+ and a C++17 compiler. Builds for both Windows and Linux.
 
 All third party dependencies are built from source, so the submodules must be checked out first:
 
