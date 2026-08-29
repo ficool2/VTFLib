@@ -1293,14 +1293,6 @@ vlBool CVTFFile::IsHeaderValid(const SVTFHeader &Header)
 		}
 	}
 
-	if(iLowResImageFormat != (vlInt)IMAGE_FORMAT_NONE &&
-	   (Header.LowResImageWidth == 0 || Header.LowResImageHeight == 0))
-	{
-		LastError.SetFormatted("File may be corrupt; low resolution image dimensions %u x %u contain a zero.",
-			(vlUInt)Header.LowResImageWidth, (vlUInt)Header.LowResImageHeight);
-		return vlFalse;
-	}
-
 	if(Header.Frames == 0)
 	{
 		LastError.Set("File may be corrupt; image has no frames.");
@@ -1423,6 +1415,13 @@ vlBool CVTFFile::Load(IO::Readers::IReader *Reader, vlBool bHeaderOnly)
 		{
 			// set resource count if version is lower than 7.3
 			this->Header->ResourceCount = 0;
+		}
+
+		if(this->Header->LowResImageWidth == 0 || this->Header->LowResImageHeight == 0)
+		{
+			this->Header->LowResImageFormat = IMAGE_FORMAT_NONE;
+			this->Header->LowResImageWidth = 0;
+			this->Header->LowResImageHeight = 0;
 		}
 
 		// Everything past this point sizes buffers and computes offsets.. sanity check it!!
