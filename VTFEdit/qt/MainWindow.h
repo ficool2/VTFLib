@@ -227,6 +227,7 @@ namespace VTFEdit
 		// VTF/VMT plumbing.
 		void updateVtfFile();
 		void invalidateImageCache();
+		QImage buildStraightAlphaImage() const;
 		void showVtfFile(VTFLib::CVTFFile *pVTFFile);
 		bool getVtfFile();
 		void showVmtFile(Document *pDocument);

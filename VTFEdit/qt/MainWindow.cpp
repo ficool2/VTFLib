@@ -995,6 +995,44 @@ namespace VTFEdit
 		m_bUpdatingVtfFile = false;
 	}
 
+	// preview uses premultiplied alpha. this will rebuild it while preserving RGB
+	QImage MainWindow::buildStraightAlphaImage() const
+	{
+		if(!m_bCompositeValid || m_DecodedBuffer.empty()
+			|| m_uiDecodedWidth == 0 || m_uiDecodedHeight == 0)
+		{
+			return QImage();
+		}
+
+		if(m_DecodedBuffer.size() < static_cast<size_t>(m_uiDecodedWidth) * m_uiDecodedHeight * 4)
+		{
+			return QImage();
+		}
+
+		QImage Image(static_cast<int>(m_uiDecodedWidth), static_cast<int>(m_uiDecodedHeight),
+			QImage::Format_ARGB32);
+
+		const int iChannel = m_iCompositeChannel;
+
+		for(vlUInt j = 0; j < m_uiDecodedHeight; j++)
+		{
+			QRgb *pScanline = reinterpret_cast<QRgb *>(Image.scanLine(static_cast<int>(j)));
+			const vlByte *pSource = m_DecodedBuffer.data() + static_cast<size_t>(j) * m_uiDecodedWidth * 4;
+
+			for(vlUInt i = 0; i < m_uiDecodedWidth; i++, pSource += 4)
+			{
+				const int iRed = iChannel < 0 ? pSource[0] : pSource[iChannel];
+				const int iGreen = iChannel < 0 ? pSource[1] : pSource[iChannel];
+				const int iBlue = iChannel < 0 ? pSource[2] : pSource[iChannel];
+				const int iAlpha = m_bCompositeMask ? pSource[3] : 255;
+
+				pScanline[i] = qRgba(iRed, iGreen, iBlue, iAlpha);
+			}
+		}
+
+		return Image;
+	}
+
 	void MainWindow::invalidateImageCache()
 	{
 		m_pDecodedVTFFile = nullptr;
@@ -2817,11 +2855,20 @@ namespace VTFEdit
 
 	void MainWindow::onCopy()
 	{
-		if(!m_pImageView->image().isNull())
+		if(m_pImageView->image().isNull())
 		{
-			QApplication::clipboard()->setImage(
-				m_pImageView->image().convertToFormat(QImage::Format_ARGB32));
+			return;
 		}
+
+		QImage Image = buildStraightAlphaImage();
+
+		if(Image.isNull())
+		{
+			// Fallback just in case...
+			Image = m_pImageView->image().convertToFormat(QImage::Format_ARGB32);
+		}
+
+		QApplication::clipboard()->setImage(Image);
 	}
 
 	void MainWindow::onPaste()
