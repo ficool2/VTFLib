@@ -55,6 +55,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPainter>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScreen>
@@ -199,6 +200,7 @@ namespace VTFEdit
 		, m_uiDecodedHeight(0)
 		, m_uiDecodedFrame(0)
 		, m_uiDecodedFace(0)
+		, m_bDecodedCross(false)
 		, m_uiDecodedSlice(0)
 		, m_uiDecodedMipmap(0)
 		, m_sDecodedExposure(0.0f)
@@ -402,6 +404,12 @@ namespace VTFEdit
 		m_pAutoCreateVmtFileAction = new QAction(tr("&Auto Create VMT File"), this);
 		m_pAutoCreateVmtFileAction->setCheckable(true);
 
+		m_pCubemapCrossAction = new QAction(tr("Unwrap &Cubemaps"), this);
+		m_pCubemapCrossAction->setCheckable(true);
+		m_pCubemapCrossAction->setChecked(true);
+		m_pCubemapCrossAction->setToolTip(tr("Preview environment maps as an unwrapped cross"));
+		connect(m_pCubemapCrossAction, &QAction::triggered, this, &MainWindow::onViewOptionChanged);
+
 		m_pSingleInstanceAction = new QAction(tr("&Single Instance"), this);
 		m_pSingleInstanceAction->setCheckable(true);
 		m_pSingleInstanceAction->setChecked(true);
@@ -470,6 +478,7 @@ namespace VTFEdit
 		QMenu *pOptionsMenu = menuBar()->addMenu(tr("&Options"));
 		pOptionsMenu->addAction(m_pAutoCreateVmtFileAction);
 		pOptionsMenu->addAction(m_pSingleInstanceAction);
+		pOptionsMenu->addAction(m_pCubemapCrossAction);
 		pOptionsMenu->addSeparator();
 		pOptionsMenu->addAction(m_pVmtEditorOptionsAction);
 
@@ -817,6 +826,36 @@ namespace VTFEdit
 	// VTF rendering.
 	//
 
+	// horizontal cross layout of the cube faces
+	static const int CubemapCrossCells[7][2] =
+	{
+		{ 2, 1 }, // +x
+		{ 0, 1 }, // -x
+		{ 1, 0 }, // +y
+		{ 1, 2 }, // -y
+		{ 1, 1 }, // +z
+		{ 3, 1 }, // -z
+		{ 2, 2 }, // spheremap
+	};
+
+	static const int CubemapCrossColumns = 4;
+	static const int CubemapCrossRows = 3;
+
+	static void blitCubemapFace(const vlByte *pSource, vlByte *pDestination,
+		vlUInt uiFaceWidth, vlUInt uiFaceHeight, vlUInt uiDestinationWidth, vlUInt uiFace,
+		size_t uiPixelSize)
+	{
+		const size_t uiRowSize = static_cast<size_t>(uiFaceWidth) * uiPixelSize;
+		const size_t uiDestinationX = static_cast<size_t>(CubemapCrossCells[uiFace][0]) * uiFaceWidth;
+		const size_t uiDestinationY = static_cast<size_t>(CubemapCrossCells[uiFace][1]) * uiFaceHeight;
+
+		for(vlUInt j = 0; j < uiFaceHeight; j++)
+		{
+			memcpy(pDestination + ((uiDestinationY + j) * uiDestinationWidth + uiDestinationX)
+				* uiPixelSize, pSource + static_cast<size_t>(j) * uiRowSize, uiRowSize);
+		}
+	}
+
 	void MainWindow::updateVtfFile()
 	{
 		if(m_pVTFFile == nullptr)
@@ -849,6 +888,21 @@ namespace VTFEdit
 		m_pSlice->setValue(static_cast<int>(uiSlice));
 		m_pSlice->setMaximum(static_cast<int>(uiDepth));
 
+		const bool bCross = m_pCubemapCrossAction->isChecked() && m_pVTFFile->GetFaceCount() >= 6;
+		// might have spheremap
+		const vlUInt uiCrossFaces = m_pVTFFile->GetFaceCount() > 6 ? 7 : 6;
+
+		const vlUInt uiFaceWidth = uiWidth;
+		const vlUInt uiFaceHeight = uiHeight;
+
+		if(bCross)
+		{
+			uiWidth = uiFaceWidth * CubemapCrossColumns;
+			uiHeight = uiFaceHeight * CubemapCrossRows;
+		}
+
+		m_pFace->setEnabled(!bCross);
+
 		float fMipmapScale = 1.0f;
 		if(m_pMipmapFullSizeAction->isChecked())
 		{
@@ -873,6 +927,7 @@ namespace VTFEdit
 		const bool bMipmapChanged = m_pDecodedVTFFile != m_pVTFFile
 			|| m_uiDecodedFrame != uiFrame
 			|| m_uiDecodedFace != uiFace
+			|| m_bDecodedCross != bCross
 			|| m_uiDecodedSlice != uiSlice
 			|| m_uiDecodedMipmap != uiMipmap
 			|| m_uiDecodedWidth != uiWidth
@@ -888,11 +943,30 @@ namespace VTFEdit
 		{
 			if(bHdr)
 			{
-				m_DecodedFloatBuffer.resize(static_cast<size_t>(uiWidth) * uiHeight * 4);
+				m_DecodedFloatBuffer.assign(static_cast<size_t>(uiWidth) * uiHeight * 4, 0.0f);
 
-				m_pVTFFile->Convert(m_pVTFFile->GetData(uiFrame, uiFace, uiSlice, uiMipmap),
-					reinterpret_cast<vlByte *>(m_DecodedFloatBuffer.data()), uiWidth, uiHeight,
-					m_pVTFFile->GetDecodeFormat(), IMAGE_FORMAT_RGBA32323232F);
+				if(bCross)
+				{
+					std::vector<vlSingle> FaceBuffer(
+						static_cast<size_t>(uiFaceWidth) * uiFaceHeight * 4);
+
+					for(vlUInt k = 0; k < uiCrossFaces; k++)
+					{
+						m_pVTFFile->Convert(m_pVTFFile->GetData(uiFrame, k, uiSlice, uiMipmap),
+							reinterpret_cast<vlByte *>(FaceBuffer.data()), uiFaceWidth, uiFaceHeight,
+							m_pVTFFile->GetDecodeFormat(), IMAGE_FORMAT_RGBA32323232F);
+
+						blitCubemapFace(reinterpret_cast<const vlByte *>(FaceBuffer.data()),
+							reinterpret_cast<vlByte *>(m_DecodedFloatBuffer.data()),
+							uiFaceWidth, uiFaceHeight, uiWidth, k, sizeof(vlSingle) * 4);
+					}
+				}
+				else
+				{
+					m_pVTFFile->Convert(m_pVTFFile->GetData(uiFrame, uiFace, uiSlice, uiMipmap),
+						reinterpret_cast<vlByte *>(m_DecodedFloatBuffer.data()), uiWidth, uiHeight,
+						m_pVTFFile->GetDecodeFormat(), IMAGE_FORMAT_RGBA32323232F);
+				}
 			}
 			else
 			{
@@ -903,6 +977,7 @@ namespace VTFEdit
 			m_pDecodedVTFFile = m_pVTFFile;
 			m_uiDecodedFrame = uiFrame;
 			m_uiDecodedFace = uiFace;
+			m_bDecodedCross = bCross;
 			m_uiDecodedSlice = uiSlice;
 			m_uiDecodedMipmap = uiMipmap;
 			m_uiDecodedWidth = uiWidth;
@@ -911,7 +986,8 @@ namespace VTFEdit
 
 		if(bMipmapChanged || (bHdr && m_sDecodedExposure != sHDRExposure))
 		{
-			m_DecodedBuffer.resize(m_pVTFFile->ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888));
+			m_DecodedBuffer.assign(
+				m_pVTFFile->ComputeImageSize(uiWidth, uiHeight, 1, IMAGE_FORMAT_RGBA8888), 0);
 
 			vlSetFloat(VTFLIB_FP16_HDR_EXPOSURE, sHDRExposure);
 
@@ -924,8 +1000,27 @@ namespace VTFEdit
 			}
 			else
 			{
-				m_pVTFFile->ConvertToRGBA8888(m_pVTFFile->GetData(uiFrame, uiFace, uiSlice, uiMipmap),
-					m_DecodedBuffer.data(), uiWidth, uiHeight, m_pVTFFile->GetDecodeFormat());
+				if(bCross)
+				{
+					std::vector<vlByte> FaceBuffer(m_pVTFFile->ComputeImageSize(
+						uiFaceWidth, uiFaceHeight, 1, IMAGE_FORMAT_RGBA8888));
+
+					for(vlUInt k = 0; k < uiCrossFaces; k++)
+					{
+						m_pVTFFile->ConvertToRGBA8888(
+							m_pVTFFile->GetData(uiFrame, k, uiSlice, uiMipmap),
+							FaceBuffer.data(), uiFaceWidth, uiFaceHeight,
+							m_pVTFFile->GetDecodeFormat());
+
+						blitCubemapFace(FaceBuffer.data(), m_DecodedBuffer.data(),
+							uiFaceWidth, uiFaceHeight, uiWidth, k, 4);
+					}
+				}
+				else
+				{
+					m_pVTFFile->ConvertToRGBA8888(m_pVTFFile->GetData(uiFrame, uiFace, uiSlice, uiMipmap),
+						m_DecodedBuffer.data(), uiWidth, uiHeight, m_pVTFFile->GetDecodeFormat());
+				}
 			}
 
 			m_sDecodedExposure = sHDRExposure;
@@ -977,6 +1072,32 @@ namespace VTFEdit
 						static_cast<int>(uiGreen * uiAlpha / 255u),
 						static_cast<int>(uiBlue * uiAlpha / 255u),
 						static_cast<int>(uiAlpha)); // premultiplied alpha ..
+				}
+			}
+
+			if(bCross)
+			{
+				bool bUsed[CubemapCrossColumns][CubemapCrossRows] = {};
+				for(vlUInt k = 0; k < uiCrossFaces; k++)
+				{
+					bUsed[CubemapCrossCells[k][0]][CubemapCrossCells[k][1]] = true;
+				}
+
+				QPainter Painter(&m_CompositeImage);
+				Painter.setCompositionMode(QPainter::CompositionMode_Source);
+
+				for(int iColumn = 0; iColumn < CubemapCrossColumns; iColumn++)
+				{
+					for(int iRow = 0; iRow < CubemapCrossRows; iRow++)
+					{
+						if(!bUsed[iColumn][iRow])
+						{
+							Painter.fillRect(iColumn * static_cast<int>(uiFaceWidth),
+								iRow * static_cast<int>(uiFaceHeight),
+								static_cast<int>(uiFaceWidth), static_cast<int>(uiFaceHeight),
+								Qt::transparent);
+						}
+					}
 				}
 			}
 
@@ -3560,6 +3681,8 @@ namespace VTFEdit
 				m_pAutoCreateVmtFileAction->setChecked(toBool(sVal));
 			else if(sArg.compare(QLatin1String("VTFEdit.SingleInstance"), Qt::CaseInsensitive) == 0)
 				m_pSingleInstanceAction->setChecked(toBool(sVal));
+			else if(sArg.compare(QLatin1String("VTFEdit.CubemapCross"), Qt::CaseInsensitive) == 0)
+				m_pCubemapCrossAction->setChecked(toBool(sVal));
 			else if(sArg.compare(QLatin1String("VTFEdit.LastFileDirectory"), Qt::CaseInsensitive) == 0)
 			{
 				if(QDir(sVal).exists())
@@ -3771,6 +3894,7 @@ namespace VTFEdit
 		Stream << "VTFEdit.MipmapFullSize = " << boolText(m_pMipmapFullSizeAction->isChecked()) << "\n";
 		Stream << "VTFEdit.AutoCreateVMTFile = " << boolText(m_pAutoCreateVmtFileAction->isChecked()) << "\n";
 		Stream << "VTFEdit.SingleInstance = " << boolText(m_pSingleInstanceAction->isChecked()) << "\n";
+		Stream << "VTFEdit.CubemapCross = " << boolText(m_pCubemapCrossAction->isChecked()) << "\n";
 		Stream << "VTFEdit.LastFileDirectory = " << FileDialogHistory::s_sFileDirectory << "\n";
 		Stream << "VTFEdit.LastImageDirectory = " << FileDialogHistory::s_sImageDirectory << "\n";
 		Stream << "VmtEditor.FontFamily = " << m_VmtEditorSettings.sFontFamily << "\n";

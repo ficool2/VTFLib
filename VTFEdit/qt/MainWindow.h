@@ -282,6 +282,7 @@ namespace VTFEdit
 		vlUInt m_uiDecodedHeight;
 		vlUInt m_uiDecodedFrame;
 		vlUInt m_uiDecodedFace;
+		bool m_bDecodedCross;
 		vlUInt m_uiDecodedSlice;
 		vlUInt m_uiDecodedMipmap;
 		vlSingle m_sDecodedExposure;
@@ -347,6 +348,7 @@ namespace VTFEdit
 		QAction *m_pConvertFolderAction;
 		QAction *m_pAutoCreateVmtFileAction;
 		QAction *m_pSingleInstanceAction;
+		QAction *m_pCubemapCrossAction;
 		QAction *m_pVmtEditorOptionsAction;
 		QAction *m_pAboutAction;
 		QMenu *m_pRecentFilesMenu;
