@@ -79,6 +79,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 #include <QWheelEvent>
+#include <QWindow>
 
 #include <algorithm>
 #include <vector>
@@ -3857,13 +3858,20 @@ namespace VTFEdit
 
 	void MainWindow::activateWithFiles(const QStringList &sFilePaths)
 	{
-		if(isMinimized())
+		setWindowState((windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
+
+		if(!isVisible())
 		{
-			showNormal();
+			show();
 		}
 
 		raise();
 		activateWindow();
+
+		if(QWindow *pHandle = windowHandle())
+		{
+			pHandle->requestActivate();
+		}
 
 		openCommandLineFiles(sFilePaths);
 	}
