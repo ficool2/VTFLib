@@ -245,6 +245,11 @@ namespace VTFEdit
 			"such as normal maps, masks, exponent maps and UI icons."));
 		pGeneralForm->addRow(m_pSrgb);
 
+		m_pNormalMap = new QCheckBox(tr("Normal map"), pGeneral);
+		m_pNormalMap->setToolTip(tr("Marks the texture as storing tangent space normals.\n"
+			"Normals are re-normalized after resizing and when generating mipmaps\n");
+		pGeneralForm->addRow(m_pNormalMap);
+
 		pGeneralForm->addRow(new QLabel(tr("Flags:"), pGeneral));
 		pGeneralForm->addRow(pFlags);
 
@@ -551,6 +556,7 @@ namespace VTFEdit
 		m_pSphereMap->setChecked(m_pOptions->GenerateSphereMap != vlFalse);
 		m_pStripAlpha->setChecked(m_pOptions->StripAlpha != vlFalse);
 		m_pSrgb->setChecked(m_pOptions->sRGB != vlFalse);
+		m_pNormalMap->setChecked(m_pOptions->NormalMap != vlFalse);
 
 		m_pDistanceAlpha->setChecked(m_pOptions->DistanceAlpha != vlFalse);
 		m_pDistanceAlphaSpread->setValue(m_pOptions->DistanceAlphaSpread);
@@ -624,6 +630,7 @@ namespace VTFEdit
 		m_pOptions->GenerateSphereMap = m_pSphereMap->isChecked() ? vlTrue : vlFalse;
 		m_pOptions->StripAlpha = m_pStripAlpha->isChecked() ? vlTrue : vlFalse;
 		m_pOptions->sRGB = m_pSrgb->isChecked() ? vlTrue : vlFalse;
+		m_pOptions->NormalMap = m_pNormalMap->isChecked() ? vlTrue : vlFalse;
 
 		m_pOptions->DistanceAlpha = m_pDistanceAlpha->isChecked() ? vlTrue : vlFalse;
 		m_pOptions->DistanceAlphaSpread = static_cast<vlSingle>(m_pDistanceAlphaSpread->value());

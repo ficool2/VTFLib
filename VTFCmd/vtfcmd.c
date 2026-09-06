@@ -313,6 +313,11 @@ int main(int argc, char* argv[])
 				CreateOptions.bSRGB = vlTrue;
 				CreateOptions.uiFlags |= TEXTUREFLAGS_SRGB;
 			}
+			else if(stricmp(argv[i], "-normal") == 0)
+			{
+				CreateOptions.bNormalMap = vlTrue;
+				CreateOptions.uiFlags |= TEXTUREFLAGS_NORMAL;
+			}
 			else if(stricmp(argv[i], "-alphaformat") == 0)
 			{
 				if(i + 1 < argc)
@@ -757,6 +762,7 @@ void PrintUsage(const vlChar *lpError, ...)
 	Print(" -cmethod <string>        (Compression method: deflate or zstd.)\n");
 	Print(" -alphaformat <string>    (Output format to use on alpha textures.)\n");
 	Print(" -srgb                    (Whether to treat image as sRGB colour space or not)\n");
+	Print(" -normal                  (Treat image as a normal map; re-normalizes resized images and mipmaps.)\n");
 	Print(" -flag <string>           (Output flags to set.)\n");
 	Print(" -resize                  (Resize the input to a power of 2.)\n");
 	Print(" -rmethod <string>        (Resize method to use.)\n");

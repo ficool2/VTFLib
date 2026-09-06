@@ -134,6 +134,7 @@ VTFLIB_API vlVoid vlImageCreateDefaultCreateStructure(SVTFCreateOptions *VTFCrea
 	VTFCreateOptions->sGammaCorrection = 2.0f;
 
 	VTFCreateOptions->bSphereMap = vlFalse;
+	VTFCreateOptions->bNormalMap = vlFalse;
 	VTFCreateOptions->bSRGB = vlFalse;
 
 	VTFCreateOptions->sAuxCompressionLevel = VTF_AUX_COMPRESSION_LEVEL_NONE;

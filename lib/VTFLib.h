@@ -333,10 +333,12 @@ typedef struct tagSVTFCreateOptions
 	vlSingle sGammaCorrection;							//!< Gamma correction to apply.
 
 	vlBool bSphereMap;									//!< Generate a sphere map for six faced environment maps.
+	vlBool bNormalMap;									//!< Texture stores tangent space normals,
 	vlBool bSRGB;										//!< Texture is in the SRGB color space.
 
 	vlShort sAuxCompressionLevel;						//!< Auxiliary compression strength; 0 disables it. (v7.6 only.)
 	vlShort sAuxCompressionMethod;						//!< A VTFAuxCompressionMethod value. (v7.6 only.)
+
 } SVTFCreateOptions;
 
 typedef struct tagSVTFTextureLODControlResource
@@ -962,6 +964,9 @@ namespace VTFLib
 		static vlBool IsFloatFormat(VTFImageFormat Format);
 
 		static vlBool Resize(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter, vlBool bSRGB);
+		static vlVoid Normalize(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight);
+		static vlVoid NormalizeRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight);
+
 		static vlBool ResizeRGBA32F(vlSingle *lpSourceRGBA32F, vlSingle *lpDestRGBA32F, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter);
 
 	private:

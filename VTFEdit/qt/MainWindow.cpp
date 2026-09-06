@@ -3640,6 +3640,8 @@ namespace VTFEdit
 				m_Options.StripAlpha = toBool(sVal);
 			else if(sArg.compare(QLatin1String("VTFOptions.sRGB"), Qt::CaseInsensitive) == 0)
 				m_Options.sRGB = toBool(sVal);
+			else if(sArg.compare(QLatin1String("VTFOptions.NormalMap"), Qt::CaseInsensitive) == 0)
+				m_Options.NormalMap = toBool(sVal);
 			else if(sArg.compare(QLatin1String("VTFOptions.DistanceAlpha"), Qt::CaseInsensitive) == 0)
 				m_Options.DistanceAlpha = toBool(sVal);
 			else if(sArg.compare(QLatin1String("VTFOptions.DistanceAlphaSpread"), Qt::CaseInsensitive) == 0)
@@ -3809,6 +3811,7 @@ namespace VTFEdit
 		Stream << "VTFOptions.FlagPointSample = " << boolText(m_Options.FlagPointSample != vlFalse) << "\n";
 		Stream << "VTFOptions.StripAlpha = " << boolText(m_Options.StripAlpha != vlFalse) << "\n";
 		Stream << "VTFOptions.sRGB = " << boolText(m_Options.sRGB != vlFalse) << "\n";
+		Stream << "VTFOptions.NormalMap = " << boolText(m_Options.NormalMap != vlFalse) << "\n";
 		Stream << "VTFOptions.DistanceAlpha = " << boolText(m_Options.DistanceAlpha != vlFalse) << "\n";
 		Stream << "VTFOptions.DistanceAlphaSpread = " << m_Options.DistanceAlphaSpread << "\n";
 		Stream << "VTFOptions.DistanceAlphaReduce = " << m_Options.DistanceAlphaReduce << "\n";

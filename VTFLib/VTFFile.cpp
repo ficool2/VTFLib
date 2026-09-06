@@ -645,6 +645,18 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 					{
 						throw 0;
 					}
+
+					if(VTFCreateOptions.bNormalMap)
+					{
+						if(bFloatSource)
+						{
+							CVTFFile::NormalizeRGBA32F((vlSingle *)lpNewImageDataRGBA8888[i], uiNewWidth, uiNewHeight);
+						}
+						else
+						{
+							CVTFFile::Normalize(lpNewImageDataRGBA8888[i], uiNewWidth, uiNewHeight);
+						}
+					}
 				}
 
 				uiWidth = uiNewWidth;
@@ -740,6 +752,18 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 							if(!bResized)
 							{
 								throw 0;
+							}
+
+							if(VTFCreateOptions.bNormalMap)
+							{
+								if(bFloatSource)
+								{
+									CVTFFile::NormalizeRGBA32F((vlSingle *)temp.data(), usWidth, usHeight);
+								}
+								else
+								{
+									CVTFFile::Normalize(temp.data(), usWidth, usHeight);
+								}
 							}
 
 							if (!this->Convert(temp.data(), this->GetData(i, j, k, m), usWidth, usHeight, SourceFormat, this->Header->ImageFormat))
@@ -4969,6 +4993,66 @@ vlBool CVTFFile::Resize(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt
 	}
 
 	return vlTrue;
+}
+
+vlVoid CVTFFile::Normalize(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight)
+{
+	vlByte *lpLast = lpImageDataRGBA8888 + ((size_t)uiWidth * (size_t)uiHeight * 4);
+
+	for(vlByte *lpPixel = lpImageDataRGBA8888; lpPixel < lpLast; lpPixel += 4)
+	{
+		// unpack from [0, 255] to [-1, 1]
+		vlSingle sX = (vlSingle)lpPixel[0] * (2.0f / 255.0f) - 1.0f;
+		vlSingle sY = (vlSingle)lpPixel[1] * (2.0f / 255.0f) - 1.0f;
+		vlSingle sZ = (vlSingle)lpPixel[2] * (2.0f / 255.0f) - 1.0f;
+
+		vlSingle sLength = sqrtf(sX * sX + sY * sY + sZ * sZ);
+
+		if(sLength < 0.00001f)
+		{
+			// degenerate normal
+			sX = 0.0f;
+			sY = 0.0f;
+			sZ = 1.0f;
+		}
+		else
+		{
+			sX /= sLength;
+			sY /= sLength;
+			sZ /= sLength;
+		}
+
+		lpPixel[0] = (vlByte)(std::min(std::max((sX + 1.0f) * (255.0f / 2.0f), 0.0f), 255.0f) + 0.5f);
+		lpPixel[1] = (vlByte)(std::min(std::max((sY + 1.0f) * (255.0f / 2.0f), 0.0f), 255.0f) + 0.5f);
+		lpPixel[2] = (vlByte)(std::min(std::max((sZ + 1.0f) * (255.0f / 2.0f), 0.0f), 255.0f) + 0.5f);
+	}
+}
+
+//
+// NormalizeRGBA32F()
+//
+vlVoid CVTFFile::NormalizeRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight)
+{
+	vlSingle *lpLast = lpImageDataRGBA32F + ((size_t)uiWidth * (size_t)uiHeight * 4);
+
+	for(vlSingle *lpPixel = lpImageDataRGBA32F; lpPixel < lpLast; lpPixel += 4)
+	{
+		vlSingle sLength = sqrtf(lpPixel[0] * lpPixel[0] + lpPixel[1] * lpPixel[1] + lpPixel[2] * lpPixel[2]);
+
+		if(sLength < 0.00001f)
+		{
+			// degenerate normal
+			lpPixel[0] = 0.0f;
+			lpPixel[1] = 0.0f;
+			lpPixel[2] = 1.0f;
+		}
+		else
+		{
+			lpPixel[0] /= sLength;
+			lpPixel[1] /= sLength;
+			lpPixel[2] /= sLength;
+		}
+	}
 }
 
 //

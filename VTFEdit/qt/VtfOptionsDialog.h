@@ -65,6 +65,7 @@ namespace VTFEdit
 		QCheckBox *m_pFlagNoLOD;
 		QCheckBox *m_pFlagPointSample;
 		QCheckBox *m_pSrgb;
+		QCheckBox *m_pNormalMap;
 
 		QCheckBox *m_pResize;
 		QComboBox *m_pResizeMethod;

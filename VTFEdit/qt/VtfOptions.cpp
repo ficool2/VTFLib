@@ -101,6 +101,7 @@ namespace VTFEdit
 		GenerateSphereMap = vlTrue;
 		StripAlpha = vlFalse;
 		sRGB = vlTrue;
+		NormalMap = vlFalse;
 
 		DistanceAlpha = vlFalse;
 		DistanceAlphaSpread = 1.0f;

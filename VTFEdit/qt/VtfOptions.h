@@ -79,6 +79,7 @@ namespace VTFEdit
 		vlBool GenerateSphereMap;
 		vlBool StripAlpha;
 		vlBool sRGB;
+		vlBool NormalMap;
 
 		vlBool DistanceAlpha;
 		vlSingle DistanceAlphaSpread;

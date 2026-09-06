@@ -163,6 +163,7 @@ namespace VTFEdit
 			VTFCreateOptions.bReflectivity = Options.ComputeReflectivity;
 			VTFCreateOptions.bSphereMap = Options.GenerateSphereMap;
 			VTFCreateOptions.bSRGB = Options.sRGB;
+			VTFCreateOptions.bNormalMap = Options.NormalMap;
 
 			if(VTFCreateOptions.uiVersion[0] == VTF_MAJOR_VERSION
 				&& VTFCreateOptions.uiVersion[1] >= VTF_MINOR_VERSION_MIN_AUX_COMPRESSION)
@@ -184,6 +185,7 @@ namespace VTFEdit
 			pVTFFile->SetFlag(TEXTUREFLAGS_CLAMPT, Options.FlagClampT);
 			pVTFFile->SetFlag(TEXTUREFLAGS_NOLOD, Options.FlagNoLOD);
 			pVTFFile->SetFlag(TEXTUREFLAGS_POINTSAMPLE, Options.FlagPointSample);
+			pVTFFile->SetFlag(TEXTUREFLAGS_NORMAL, Options.NormalMap);
 		}
 
 		bool CreateResources(const VtfOptions &Options, VTFLib::CVTFFile *pVTFFile)

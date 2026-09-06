@@ -89,8 +89,9 @@ typedef struct tagSVTFCreateOptions
 	vlSingle sGammaCorrection;							//!< Gamma correction to apply.
 
 	vlBool bSphereMap;									//!< Generate a sphere map for six faced environment maps.
+	vlBool bNormalMap;									//!< Texture stores tangent space normals.
 	vlBool bSRGB;										//!< Texture is in the SRGB color space.
-
+	
 	vlShort sAuxCompressionLevel;						//!< Auxiliary compression strength; 0 disables it. (v7.6 only.)
 	vlShort sAuxCompressionMethod;						//!< A VTFAuxCompressionMethod value. (v7.6 only.)
 } SVTFCreateOptions;
@@ -809,6 +810,26 @@ namespace VTFLib
 			\param ResizeFilter is the image reduction filter to use.
 			\return true on sucessful re-size, otherwise false.
 		*/
+		//! Re-normalizes an image holding tangent space normals.
+		/*!
+			Rescales each pixel's RGB channels so they describe a unit length normal vector again
+			
+			\param lpImageDataRGBA8888 is a pointer to the image data in RGBA8888 format.
+			\param uiWidth is the width of the image in pixels.
+			\param uiHeight is the height of the image in pixels.
+		*/
+		static vlVoid Normalize(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight);
+
+		//! Re-normalizes a 32 bit float image holding tangent space normals.
+		/*!
+			Rescales each pixel's RGB channels so they describe a unit length normal vector again
+			
+			\param lpImageDataRGBA32F is a pointer to the image data in RGBA32323232F format.
+			\param uiWidth is the width of the image in pixels.
+			\param uiHeight is the height of the image in pixels.
+		*/
+		static vlVoid NormalizeRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight);
+
 		static vlBool ResizeRGBA32F(vlSingle *lpSourceRGBA32F, vlSingle *lpDestRGBA32F, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter);
 
 		//! Converts an image's alpha channel into a signed distance field.
