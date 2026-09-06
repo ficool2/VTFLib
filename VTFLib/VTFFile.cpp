@@ -3568,9 +3568,9 @@ static SVTFImageFormatInfo VTFImageFormatInfo[] =
 	{ "R8",					  8,  1,  8,  0,  0,  0, vlFalse,  vlTrue },		// IMAGE_FORMAT_R8
 	{ "BC7",				  8,  0,  0,  0,  0,  8,  vlTrue,  vlTrue },		// IMAGE_FORMAT_BC7
 	{ "BC6H_SIGNED",		  8,  0, 16, 16, 16,  0,  vlTrue,  vlTrue },		// IMAGE_FORMAT_BC6H
+	{ "BC6H_UNSIGNED",		  8,  0, 16, 16, 16,  0,  vlTrue,  vlTrue },		// IMAGE_FORMAT_BC6H_UNSIGNED
 	{ "BC5",				  8,  0,  0,  0,  0,  0,  vlTrue,  vlTrue },		// IMAGE_FORMAT_BC5
-	{ "BC4",				  4,  0,  0,  0,  0,  0,  vlTrue,  vlTrue },		// IMAGE_FORMAT_BC4
-	{ "BC6H_UNSIGNED",		  8,  0, 16, 16, 16,  0,  vlTrue,  vlTrue }			// IMAGE_FORMAT_BC6H_UNSIGNED
+	{ "BC4",				  4,  0,  0,  0,  0,  0,  vlTrue,  vlTrue }			// IMAGE_FORMAT_BC4
 };
 
 SVTFImageFormatInfo const &CVTFFile::GetImageFormatInfo(VTFImageFormat ImageFormat)
@@ -4192,9 +4192,9 @@ static SVTFImageConvertInfo VTFImageConvertInfo[] =
 	{	  8,  1,  8,  0,  0,  0,	 0,	-1,	-1,	-1, vlFalse,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_R8},
 	{	  8,  0,  0,  0,  0,  8,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC7},
 	{	  8,  0, 16, 16, 16,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC6H},
+	{	  8,  0, 16, 16, 16,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC6H_UNSIGNED},
 	{	  8,  0,  0,  0,  0,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC5},
-	{	  4,  0,  0,  0,  0,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC4},
-	{	  8,  0, 16, 16, 16,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC6H_UNSIGNED}
+	{	  4,  0,  0,  0,  0,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC4}
 };
 
 // Mask for a channel of uiBitsPerPixel bits

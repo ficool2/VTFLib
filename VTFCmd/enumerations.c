@@ -153,6 +153,14 @@ VTFImageFormat StringToImageFormat(const vlChar *cString)
 	{
 		return IMAGE_FORMAT_BC6H_UNSIGNED;
 	}
+	else if(stricmp(cString, "BC5") == 0)
+	{
+		return IMAGE_FORMAT_BC5;
+	}
+	else if(stricmp(cString, "BC4") == 0)
+	{
+		return IMAGE_FORMAT_BC4;
+	}
 	else
 	{
 		return IMAGE_FORMAT_COUNT;
