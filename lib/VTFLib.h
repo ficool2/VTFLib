@@ -46,8 +46,8 @@ typedef vlSingle		vlFloat;
 #define vlFalse			0
 #define vlTrue			1
 
-#define VL_VERSION			223
-#define VL_VERSION_STRING	"2.2.3"
+#define VL_VERSION			230
+#define VL_VERSION_STRING	"2.3.0"
 
 #define VTF_MAJOR_VERSION	7
 #define VTF_MINOR_VERSION	6
