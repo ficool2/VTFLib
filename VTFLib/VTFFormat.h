@@ -183,7 +183,7 @@ typedef enum tagVTFCubeMapFace
 	CUBEMAP_FACE_FRONT,			// -y
 	CUBEMAP_FACE_UP,			// +z
 	CUBEMAP_FACE_DOWN,			// -z
-	CUBEMAP_FACE_SphereMap,		// fall back
+	CUBEMAP_FACE_SPHERE_MAP,	// fall back
 	CUBEMAP_FACE_COUNT
 } VTFCubeMapFace;
 

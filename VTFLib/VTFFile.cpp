@@ -3389,7 +3389,7 @@ vlBool CVTFFile::GenerateSphereMap()
 	//#pragma warning(default: 4244)
 
 	if (!this->ConvertFromRGBA8888(lpSphereMapData,
-									this->GetData(0, CUBEMAP_FACE_SphereMap, 0, 0),
+									this->GetData(0, CUBEMAP_FACE_SPHERE_MAP, 0, 0),
 									this->Header->Width,
 									this->Header->Height,
 									this->Header->ImageFormat) )

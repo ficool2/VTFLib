@@ -195,7 +195,7 @@ typedef enum tagVTFCubeMapFace
 	CUBEMAP_FACE_FRONT,			// -y
 	CUBEMAP_FACE_UP,			// +z
 	CUBEMAP_FACE_DOWN,			// -z
-	CUBEMAP_FACE_SPHERE_MAP,		// fall back
+	CUBEMAP_FACE_SphereMap,			// fall back
 	CUBEMAP_FACE_COUNT
 } VTFCubeMapFace;
 
@@ -219,6 +219,45 @@ typedef enum tagVTFMipmapFilter
 	MIPMAP_FILTER_COUNT
 } VTFMipmapFilter;
 
+#define KERNEL_FILTER_BASE 1040
+
+typedef enum tagVTFKernelFilter
+{
+	KERNEL_FILTER_4X = 0,
+	KERNEL_FILTER_3X3,
+	KERNEL_FILTER_5X5,
+	KERNEL_FILTER_7X7,
+	KERNEL_FILTER_9X9,
+	KERNEL_FILTER_DUDV,
+	KERNEL_FILTER_COUNT
+} VTFKernelFilter;
+
+#define HEIGHT_CONVERSION_METHOD_BASE 1009
+
+typedef enum tagVTFHeightConversionMethod
+{
+	HEIGHT_CONVERSION_METHOD_ALPHA = 0,
+	HEIGHT_CONVERSION_METHOD_AVERAGE_RGB,
+	HEIGHT_CONVERSION_METHOD_BIASED_RGB,
+	HEIGHT_CONVERSION_METHOD_RED,
+	HEIGHT_CONVERSION_METHOD_GREEN,
+	HEIGHT_CONVERSION_METHOD_BLUE,
+	HEIGHT_CONVERSION_METHOD_MAX_RGB,
+	HEIGHT_CONVERSION_METHOD_COLORSPACE,
+	HEIGHT_CONVERSION_METHOD_COUNT
+} VTFHeightConversionMethod;
+
+#define NORMAL_ALPHA_RESULT_BASE 1033
+
+typedef enum tagVTFNormalAlphaResult
+{
+	NORMAL_ALPHA_RESULT_NOCHANGE = 0,
+	NORMAL_ALPHA_RESULT_HEIGHT,
+	NORMAL_ALPHA_RESULT_BLACK,
+	NORMAL_ALPHA_RESULT_WHITE,
+	NORMAL_ALPHA_RESULT_COUNT
+} VTFNormalAlphaResult;
+
 typedef enum tagVTFResizeMethod
 {
     RESIZE_NEAREST_POWER2 = 0,
@@ -230,6 +269,16 @@ typedef enum tagVTFResizeMethod
     RESIZE_SMALLEST_MULTIPLE4,
 	RESIZE_COUNT
 } VTFResizeMethod;
+
+typedef enum tagVTFLookDir
+{
+	LOOK_DOWN_X = 0,
+	LOOK_DOWN_NEGX,
+	LOOK_DOWN_Y,
+	LOOK_DOWN_NEGY,
+	LOOK_DOWN_Z,
+	LOOK_DOWN_NEGZ
+} VTFLookDir;
 
 #define MAKE_VTF_RSRC_ID(a, b, c) ((vlUInt)(((vlByte)a) | ((vlByte)b << 8) | ((vlByte)c << 16)))
 #define MAKE_VTF_RSRC_IDF(a, b, c, d) ((vlUInt)(((vlByte)a) | ((vlByte)b << 8) | ((vlByte)c << 16) | ((vlByte)d << 24)))
@@ -541,8 +590,11 @@ VTFLIB_API vlVoid *vlImageSetResourceData(vlUInt uiType, vlUInt uiSize, vlVoid *
 // Helper routines.
 //
 
-VTFLIB_API vlBool vlImageGenerateMipmaps(vlUInt uiFace, vlUInt uiFrame, VTFMipmapFilter MipmapFilter);
-VTFLIB_API vlBool vlImageGenerateAllMipmaps(VTFMipmapFilter MipmapFilter);
+VTFLIB_API vlBool vlImageGenerateMipmaps(vlUInt uiFace, vlUInt uiFrame, VTFMipmapFilter MipmapFilter, vlBool bSRGB);
+VTFLIB_API vlBool vlImageGenerateAllMipmaps(VTFMipmapFilter MipmapFilter, vlBool bSRGB);
+
+VTFLIB_API vlBool vlImageGenerateNormalMap(vlUInt uiFrame, VTFKernelFilter KernelFilter, VTFHeightConversionMethod HeightConversionMethod, VTFNormalAlphaResult NormalAlphaResult);
+VTFLIB_API vlBool vlImageGenerateAllNormalMaps(VTFKernelFilter KernelFilter, VTFHeightConversionMethod HeightConversionMethod, VTFNormalAlphaResult NormalAlphaResult);
 
 VTFLIB_API vlBool vlImageGenerateThumbnail(vlBool bSRGB);
 
@@ -569,7 +621,7 @@ VTFLIB_API vlBool vlImageConvertFromRGBA8888(vlByte *lpSource, vlByte *lpDest, v
 VTFLIB_API vlBool vlImageConvert(vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, vlUInt uiHeight, VTFImageFormat SourceFormat, VTFImageFormat DestFormat);
 VTFLIB_API vlBool vlImageIsFloatFormat(VTFImageFormat Format);
 
-VTFLIB_API vlBool vlImageResize(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter);
+VTFLIB_API vlBool vlImageResize(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter, vlBool bSRGB);
 VTFLIB_API vlBool vlImageResizeRGBA32F(vlSingle *lpSourceRGBA32F, vlSingle *lpDestRGBA32F, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter);
 
 VTFLIB_API vlBool vlImageConvertToDistanceField(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, vlSingle sSpread, vlByte bThreshold, vlBool *pbClipped);
@@ -843,8 +895,8 @@ namespace VTFLib
 	public:
 		vlBool Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames = 1, vlUInt uiFaces = 1, vlUInt uiSlices = 1, VTFImageFormat ImageFormat = IMAGE_FORMAT_RGBA8888, vlBool bThumbnail = vlTrue, vlBool bMipmaps = vlTrue, vlBool bNullImageData = vlFalse);
 		vlBool Create(vlUInt uiWidth, vlUInt uiHeight, vlByte *lpImageDataRGBA8888, const SVTFCreateOptions &VTFCreateOptions);
-		vlBool Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt uiFaces, vlUInt uiSlices, vlByte **lpImageDataRGBA8888, const SVTFCreateOptions &VTFCreateOptions);
-		vlBool Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt uiFaces, vlUInt uiSlices, vlByte **lpImageData, const SVTFCreateOptions &VTFCreateOptions, VTFImageFormat SourceFormat);
+		vlBool Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt uiFaces, vlUInt vlSlices, vlByte **lpImageDataRGBA8888, const SVTFCreateOptions &VTFCreateOptions);
+		vlBool Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt uiFaces, vlUInt vlSlices, vlByte **lpImageData, const SVTFCreateOptions &VTFCreateOptions, VTFImageFormat SourceFormat);
 		vlVoid Destroy();
 
 		vlBool IsLoaded() const;
@@ -860,8 +912,14 @@ namespace VTFLib
 	private:
 		vlBool IsPowerOfTwo(vlUInt uiSize);
 		vlUInt NextPowerOfTwo(vlUInt uiSize);
+		vlUInt ComputeResizedDimension(vlUInt uiSize, VTFResizeMethod ResizeMethod);
 
 		vlVoid ComputeResources();
+
+		// Sorted insert of resources
+		static vlUInt GetResourceSortKey(vlUInt uiType);
+		static vlVoid SortResources(SVTFHeader &Header);
+		static vlUInt InsertResource(SVTFHeader &Header, vlUInt uiType);
 
 		vlBool Load(IO::Readers::IReader *Reader, vlBool bHeaderOnly);
 		vlBool Save(IO::Writers::IWriter *Writer) const;
@@ -931,8 +989,11 @@ namespace VTFLib
 		vlBool SetAuxCompressionMethod(vlShort sMethod);
 
 	public:
-		vlBool GenerateMipmaps(VTFMipmapFilter MipmapFilter = MIPMAP_FILTER_BOX);
-		vlBool GenerateMipmaps(vlUInt uiFace, vlUInt uiFrame, VTFMipmapFilter MipmapFilter = MIPMAP_FILTER_BOX);
+		vlBool GenerateMipmaps(VTFMipmapFilter MipmapFilter, vlBool bSRGB);
+		vlBool GenerateMipmaps(vlUInt uiFace, vlUInt uiFrame, VTFMipmapFilter MipmapFilter, vlBool bSRGB);
+
+		vlBool GenerateNormalMap(VTFKernelFilter KernelFilter = KERNEL_FILTER_3X3, VTFHeightConversionMethod HeightConversionMethod = HEIGHT_CONVERSION_METHOD_AVERAGE_RGB, VTFNormalAlphaResult NormalAlphaResult = NORMAL_ALPHA_RESULT_WHITE);
+		vlBool GenerateNormalMap(vlUInt uiFrame, VTFKernelFilter KernelFilter = KERNEL_FILTER_3X3, VTFHeightConversionMethod HeightConversionMethod = HEIGHT_CONVERSION_METHOD_AVERAGE_RGB, VTFNormalAlphaResult NormalAlphaResult = NORMAL_ALPHA_RESULT_WHITE);
 
 		vlBool GenerateThumbnail(vlBool bSRGB);
 
@@ -970,9 +1031,7 @@ namespace VTFLib
 		static vlBool ResizeRGBA32F(vlSingle *lpSourceRGBA32F, vlSingle *lpDestRGBA32F, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, VTFMipmapFilter ResizeFilter);
 
 	private:
-		static vlBool DecompressDXT1(vlByte *src, vlByte *dst, vlUInt uiWidth, vlUInt uiHeight);
-		static vlBool DecompressDXT3(vlByte *src, vlByte *dst, vlUInt uiWidth, vlUInt uiHeight);
-		static vlBool DecompressDXT5(vlByte *src, vlByte *dst, vlUInt uiWidth, vlUInt uiHeight);
+		static vlBool DecompressDXTn(vlByte *src, vlByte *dst, vlUInt uiWidth, vlUInt uiHeight, VTFImageFormat SourceFormat);
 
 		static vlBool CompressDXTn(vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, vlUInt uiHeight, VTFImageFormat DestFormat);
 
