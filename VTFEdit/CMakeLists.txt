@@ -22,6 +22,8 @@ qt_add_executable(vtfedit
 	qt/VtfOptions.h
 	qt/VtfOptionsDialog.cpp
 	qt/VtfOptionsDialog.h
+	qt/VtfPresets.cpp
+	qt/VtfPresets.h
 	qt/VtfFileUtility.cpp
 	qt/VtfFileUtility.h
 	qt/VmtFileUtility.cpp

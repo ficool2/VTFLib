@@ -20,6 +20,7 @@
 #pragma once
 
 #include "VtfOptions.h"
+#include "VtfPresets.h"
 
 #include <QDialog>
 
@@ -28,6 +29,7 @@ class QComboBox;
 class QDoubleSpinBox;
 class QLabel;
 class QLineEdit;
+class QPushButton;
 class QSpinBox;
 
 namespace VTFEdit
@@ -43,17 +45,37 @@ namespace VTFEdit
 
 	private slots:
 		void onResetClicked();
+		void onPresetChanged(int iIndex);
+		void onPresetSaveClicked();
+		void onPresetDeleteClicked();
+		void onPresetRestoreClicked();
+		void onSettingChanged();
 		void updateEnabledState();
 
 	private:
+		QWidget *createPresetBar();
 		QWidget *createGeneralTab();
 		QWidget *createAdvancedTab();
 		QWidget *createResourcesTab();
 
 		void optionsToControls();
+		void optionsToControls(const VtfOptions &Options);
 		void controlsToOptions();
+		void controlsToOptions(VtfOptions &Options) const;
+
+		void fillPresets(int iSelected);
+		void updatePresetButtons(int iPreset);
+		void syncPresetSelection();
 
 		VtfOptions *m_pOptions;
+
+		VtfPresets m_Presets;
+		bool m_bApplyingPreset;
+
+		QComboBox *m_pPreset;
+		QPushButton *m_pPresetSave;
+		QPushButton *m_pPresetDelete;
+		QPushButton *m_pPresetRestore;
 
 		QComboBox *m_pFormat;
 		QComboBox *m_pAlphaFormat;

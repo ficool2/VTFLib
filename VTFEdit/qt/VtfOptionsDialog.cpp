@@ -27,9 +27,12 @@
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStandardItemModel>
 #include <QTabWidget>
@@ -152,8 +155,13 @@ namespace VTFEdit
 	VtfOptionsDialog::VtfOptionsDialog(VtfOptions *pOptions, QWidget *pParent)
 		: QDialog(pParent)
 		, m_pOptions(pOptions)
+		, m_bApplyingPreset(false)
 	{
 		setWindowTitle(tr("VTF Options"));
+
+		m_Presets.read();
+
+		QWidget *pPresetBar = createPresetBar();
 
 		QTabWidget *pTabs = new QTabWidget(this);
 		pTabs->addTab(createGeneralTab(), tr("General"));
@@ -168,6 +176,7 @@ namespace VTFEdit
 			this, &VtfOptionsDialog::onResetClicked);
 
 		QVBoxLayout *pLayout = new QVBoxLayout(this);
+		pLayout->addWidget(pPresetBar);
 		pLayout->addWidget(pTabs);
 		pLayout->addWidget(pButtons);
 
@@ -182,6 +191,227 @@ namespace VTFEdit
 		connect(m_pTextureType, &QComboBox::currentIndexChanged, this, &VtfOptionsDialog::updateEnabledState);
 		connect(m_pVersion, &QComboBox::currentIndexChanged, this, &VtfOptionsDialog::updateEnabledState);
 		connect(m_pCompressionLevel, &QComboBox::currentIndexChanged, this, &VtfOptionsDialog::updateEnabledState);
+
+		for(QCheckBox *pCheckBox : pTabs->findChildren<QCheckBox *>())
+		{
+			connect(pCheckBox, &QCheckBox::toggled, this, &VtfOptionsDialog::onSettingChanged);
+		}
+		for(QComboBox *pComboBox : pTabs->findChildren<QComboBox *>())
+		{
+			connect(pComboBox, &QComboBox::currentIndexChanged, this, &VtfOptionsDialog::onSettingChanged);
+		}
+		for(QSpinBox *pSpinBox : pTabs->findChildren<QSpinBox *>())
+		{
+			connect(pSpinBox, &QSpinBox::valueChanged, this, &VtfOptionsDialog::onSettingChanged);
+		}
+		for(QDoubleSpinBox *pSpinBox : pTabs->findChildren<QDoubleSpinBox *>())
+		{
+			connect(pSpinBox, &QDoubleSpinBox::valueChanged, this, &VtfOptionsDialog::onSettingChanged);
+		}
+	}
+
+	QWidget *VtfOptionsDialog::createPresetBar()
+	{
+		QWidget *pBar = new QWidget(this);
+		QHBoxLayout *pLayout = new QHBoxLayout(pBar);
+		pLayout->setContentsMargins(0, 0, 0, 0);
+
+		m_pPreset = new QComboBox(pBar);
+		m_pPreset->setToolTip(tr("Applies a set of options for a common kind of texture.\n"
+			"Changing any option switches this back to Custom."));
+		m_pPreset->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+		m_pPresetSave = new QPushButton(tr("Save..."), pBar);
+		m_pPresetSave->setToolTip(tr("Saves the current options as a preset.\n"
+			"Saving over the name of an existing preset replaces it, including the built-in ones."));
+		m_pPresetDelete = new QPushButton(tr("Delete"), pBar);
+		m_pPresetDelete->setToolTip(tr("Deletes the selected preset."));
+		m_pPresetRestore = new QPushButton(tr("Restore Defaults"), pBar);
+		m_pPresetRestore->setToolTip(tr("Reverts changes to the stock presets.\n"
+			"Presets you made yourself are left alone."));
+
+		pLayout->addWidget(new QLabel(tr("Preset:"), pBar));
+		pLayout->addWidget(m_pPreset, 1);
+		pLayout->addWidget(m_pPresetSave);
+		pLayout->addWidget(m_pPresetDelete);
+		pLayout->addWidget(m_pPresetRestore);
+
+		fillPresets(-1);
+
+		connect(m_pPreset, &QComboBox::currentIndexChanged, this, &VtfOptionsDialog::onPresetChanged);
+		connect(m_pPresetSave, &QPushButton::clicked, this, &VtfOptionsDialog::onPresetSaveClicked);
+		connect(m_pPresetDelete, &QPushButton::clicked, this, &VtfOptionsDialog::onPresetDeleteClicked);
+		connect(m_pPresetRestore, &QPushButton::clicked, this, &VtfOptionsDialog::onPresetRestoreClicked);
+
+		return pBar;
+	}
+
+	void VtfOptionsDialog::fillPresets(int iSelected)
+	{
+		const QSignalBlocker Blocker(m_pPreset);
+
+		m_pPreset->clear();
+		m_pPreset->addItem(tr("Custom"), -1);
+
+		for(int i = 0; i < m_Presets.count(); i++)
+		{
+			const VtfPreset *pPreset = m_Presets.at(i);
+
+			m_pPreset->addItem(m_Presets.isModified(i)
+				? tr("%1 (edited)").arg(pPreset->sName) : pPreset->sName, i);
+			if(!pPreset->sDescription.isEmpty())
+			{
+				m_pPreset->setItemData(m_pPreset->count() - 1, pPreset->sDescription, Qt::ToolTipRole);
+			}
+		}
+
+		const int iIndex = m_pPreset->findData(iSelected);
+		m_pPreset->setCurrentIndex(iIndex >= 0 ? iIndex : 0);
+
+		updatePresetButtons(iSelected);
+	}
+
+	void VtfOptionsDialog::updatePresetButtons(int iPreset)
+	{
+		m_pPresetDelete->setEnabled(m_Presets.at(iPreset) != nullptr);
+		m_pPresetRestore->setEnabled(m_Presets.hasModifiedBuiltins());
+	}
+
+	void VtfOptionsDialog::syncPresetSelection()
+	{
+		VtfOptions Current;
+		controlsToOptions(Current);
+
+		const int iPreset = m_Presets.match(Current);
+
+		const QSignalBlocker Blocker(m_pPreset);
+		const int iIndex = m_pPreset->findData(iPreset);
+		m_pPreset->setCurrentIndex(iIndex >= 0 ? iIndex : 0);
+
+		updatePresetButtons(iPreset);
+	}
+
+	void VtfOptionsDialog::onSettingChanged()
+	{
+		if(m_bApplyingPreset)
+		{
+			return;
+		}
+
+		syncPresetSelection();
+	}
+
+	void VtfOptionsDialog::onPresetChanged(int iIndex)
+	{
+		const int iPreset = m_pPreset->itemData(iIndex).toInt();
+		const VtfPreset *pPreset = m_Presets.at(iPreset);
+
+		updatePresetButtons(iPreset);
+
+		if(pPreset == nullptr)
+		{
+			return;
+		}
+
+		// keep the settings a preset doesn't cover yet
+		VtfOptions Options;
+		controlsToOptions(Options);
+		VtfPresets::apply(*pPreset, Options);
+
+		m_bApplyingPreset = true;
+		optionsToControls(Options);
+		m_bApplyingPreset = false;
+
+		updateEnabledState();
+	}
+
+	void VtfOptionsDialog::onPresetSaveClicked()
+	{
+		const int iCurrent = m_pPreset->currentData().toInt();
+		const VtfPreset *pCurrent = m_Presets.at(iCurrent);
+		const QString sSuggested = pCurrent != nullptr ? pCurrent->sName : QString();
+
+		bool bOk = false;
+		const QString sName = QInputDialog::getText(this, tr("Save Preset"),
+			tr("Preset name:"), QLineEdit::Normal, sSuggested, &bOk).trimmed();
+
+		if(!bOk || sName.isEmpty())
+		{
+			return;
+		}
+
+		const int iExisting = m_Presets.indexOf(sName);
+
+		if(iExisting != -1)
+		{
+			const QString sQuestion = m_Presets.at(iExisting)->bBuiltin
+				? tr("Replace the built in preset \"%1\"?\n\n"
+					"You can put it back later with Restore Defaults.").arg(sName)
+				: tr("A preset named \"%1\" already exists. Replace it?").arg(sName);
+
+			if(QMessageBox::question(this, tr("Save Preset"), sQuestion) != QMessageBox::Yes)
+			{
+				return;
+			}
+		}
+
+		VtfOptions Options;
+		controlsToOptions(Options);
+
+		const int iIndex = m_Presets.save(sName, Options);
+
+		if(iIndex == -1)
+		{
+			return;
+		}
+
+		m_Presets.write();
+
+		fillPresets(iIndex);
+	}
+
+	void VtfOptionsDialog::onPresetDeleteClicked()
+	{
+		const int iCurrent = m_pPreset->currentData().toInt();
+		const VtfPreset *pCurrent = m_Presets.at(iCurrent);
+
+		if(pCurrent == nullptr)
+		{
+			return;
+		}
+
+		const QString sQuestion = pCurrent->bBuiltin
+			? tr("Delete the built in preset \"%1\"?\n\n"
+				"You can put it back later with Restore Defaults.").arg(pCurrent->sName)
+			: tr("Delete the preset \"%1\"?").arg(pCurrent->sName);
+
+		if(QMessageBox::question(this, tr("Delete Preset"), sQuestion) != QMessageBox::Yes)
+		{
+			return;
+		}
+
+		m_Presets.remove(iCurrent);
+		m_Presets.write();
+
+		fillPresets(-1);
+		syncPresetSelection();
+	}
+
+	void VtfOptionsDialog::onPresetRestoreClicked()
+	{
+		if(QMessageBox::question(this, tr("Restore Defaults"),
+			tr("Put the built in presets back to how they shipped?\n\n"
+				"Any edits to them are lost and any that were deleted come back. "
+				"Presets you made yourself are kept.")) != QMessageBox::Yes)
+		{
+			return;
+		}
+
+		m_Presets.restoreDefaults();
+		m_Presets.write();
+
+		fillPresets(-1);
+		syncPresetSelection();
 	}
 
 	QWidget *VtfOptionsDialog::createGeneralTab()
@@ -247,7 +477,7 @@ namespace VTFEdit
 
 		m_pNormalMap = new QCheckBox(tr("Normal map"), pGeneral);
 		m_pNormalMap->setToolTip(tr("Marks the texture as storing tangent space normals.\n"
-			"Normals are re-normalized after resizing and when generating mipmaps\n");
+			"Normals are re-normalized after resizing and when generating mipmaps."));
 		pGeneralForm->addRow(m_pNormalMap);
 
 		pGeneralForm->addRow(new QLabel(tr("Flags:"), pGeneral));
@@ -428,8 +658,12 @@ namespace VTFEdit
 
 	int VtfOptionsDialog::exec()
 	{
+		m_bApplyingPreset = true;
 		optionsToControls();
+		m_bApplyingPreset = false;
+
 		updateEnabledState();
+		syncPresetSelection();
 
 		const int iResult = QDialog::exec();
 
@@ -446,8 +680,12 @@ namespace VTFEdit
 		VtfOptions Defaults;
 		*m_pOptions = Defaults;
 
+		m_bApplyingPreset = true;
 		optionsToControls();
+		m_bApplyingPreset = false;
+
 		updateEnabledState();
+		syncPresetSelection();
 	}
 
 	void VtfOptionsDialog::updateEnabledState()
@@ -495,9 +733,14 @@ namespace VTFEdit
 
 	void VtfOptionsDialog::optionsToControls()
 	{
+		optionsToControls(*m_pOptions);
+	}
+
+	void VtfOptionsDialog::optionsToControls(const VtfOptions &Options)
+	{
 		for(int i = 0; i < NormalImageFormatCount; i++)
 		{
-			if(NormalImageFormats[i].Format == m_pOptions->NormalFormat)
+			if(NormalImageFormats[i].Format == Options.NormalFormat)
 			{
 				m_pFormat->setCurrentIndex(i);
 			}
@@ -505,155 +748,160 @@ namespace VTFEdit
 
 		for(int i = 0; i < AlphaImageFormatCount; i++)
 		{
-			if(AlphaImageFormats[i].Format == m_pOptions->AlphaFormat)
+			if(AlphaImageFormats[i].Format == Options.AlphaFormat)
 			{
 				m_pAlphaFormat->setCurrentIndex(i);
 			}
 		}
 
-		m_pTextureType->setCurrentIndex(static_cast<int>(m_pOptions->TextureType));
+		m_pTextureType->setCurrentIndex(static_cast<int>(Options.TextureType));
 
-		m_pFlagClampS->setChecked(m_pOptions->FlagClampS != vlFalse);
-		m_pFlagClampT->setChecked(m_pOptions->FlagClampT != vlFalse);
-		m_pFlagNoLOD->setChecked(m_pOptions->FlagNoLOD != vlFalse);
-		m_pFlagPointSample->setChecked(m_pOptions->FlagPointSample != vlFalse);
+		m_pFlagClampS->setChecked(Options.FlagClampS != vlFalse);
+		m_pFlagClampT->setChecked(Options.FlagClampT != vlFalse);
+		m_pFlagNoLOD->setChecked(Options.FlagNoLOD != vlFalse);
+		m_pFlagPointSample->setChecked(Options.FlagPointSample != vlFalse);
 
-		m_pResize->setChecked(m_pOptions->ResizeImage != vlFalse);
-		const int iResizeMethodIndex = m_pResizeMethod->findData(static_cast<int>(m_pOptions->ResizeMethod));
+		m_pResize->setChecked(Options.ResizeImage != vlFalse);
+		const int iResizeMethodIndex = m_pResizeMethod->findData(static_cast<int>(Options.ResizeMethod));
 		m_pResizeMethod->setCurrentIndex(iResizeMethodIndex >= 0 ? iResizeMethodIndex : 0);
-		setMipmapFilter(m_pResizeFilter, m_pOptions->ResizeFilter);
-		m_pResizeClamp->setChecked(m_pOptions->ResizeClamp != vlFalse);
+		setMipmapFilter(m_pResizeFilter, Options.ResizeFilter);
+		m_pResizeClamp->setChecked(Options.ResizeClamp != vlFalse);
 
-		const int iWidthIndex = m_pMaximumWidth->findText(QString::number(m_pOptions->ResizeClampWidth));
+		const int iWidthIndex = m_pMaximumWidth->findText(QString::number(Options.ResizeClampWidth));
 		m_pMaximumWidth->setCurrentIndex(iWidthIndex >= 0 ? iWidthIndex : m_pMaximumWidth->count() - 1);
-		const int iHeightIndex = m_pMaximumHeight->findText(QString::number(m_pOptions->ResizeClampHeight));
+		const int iHeightIndex = m_pMaximumHeight->findText(QString::number(Options.ResizeClampHeight));
 		m_pMaximumHeight->setCurrentIndex(iHeightIndex >= 0 ? iHeightIndex : m_pMaximumHeight->count() - 1);
 
-		m_pMipmaps->setChecked(m_pOptions->GenerateMipmaps != vlFalse);
-		setMipmapFilter(m_pMipmapFilter, m_pOptions->MipmapFilter);
+		m_pMipmaps->setChecked(Options.GenerateMipmaps != vlFalse);
+		setMipmapFilter(m_pMipmapFilter, Options.MipmapFilter);
 
-		const int iVersionIndex = m_pVersion->findText(m_pOptions->Version);
+		const int iVersionIndex = m_pVersion->findText(Options.Version);
 		m_pVersion->setCurrentIndex(iVersionIndex >= 0 ? iVersionIndex : 2); // 7.4
 
-		if(m_pOptions->AuxCompressionLevel == VTF_AUX_COMPRESSION_LEVEL_DEFAULT)
+		if(Options.AuxCompressionLevel == VTF_AUX_COMPRESSION_LEVEL_DEFAULT)
 		{
 			m_pCompressionLevel->setCurrentIndex(1);
 		}
-		else if(m_pOptions->AuxCompressionLevel <= VTF_AUX_COMPRESSION_LEVEL_NONE
-			|| m_pOptions->AuxCompressionLevel > VTF_AUX_COMPRESSION_LEVEL_MAX)
+		else if(Options.AuxCompressionLevel <= VTF_AUX_COMPRESSION_LEVEL_NONE
+			|| Options.AuxCompressionLevel > VTF_AUX_COMPRESSION_LEVEL_MAX)
 		{
 			m_pCompressionLevel->setCurrentIndex(0);
 		}
 		else
 		{
-			m_pCompressionLevel->setCurrentIndex(m_pOptions->AuxCompressionLevel + 1);
+			m_pCompressionLevel->setCurrentIndex(Options.AuxCompressionLevel + 1);
 		}
 		m_pCompressionMethod->setCurrentIndex(
-			m_pOptions->AuxCompressionMethod == AUX_COMPRESSION_METHOD_ZSTD ? 1 : 0);
+			Options.AuxCompressionMethod == AUX_COMPRESSION_METHOD_ZSTD ? 1 : 0);
 
-		m_pReflectivity->setChecked(m_pOptions->ComputeReflectivity != vlFalse);
-		m_pThumbnail->setChecked(m_pOptions->GenerateThumbnail != vlFalse);
-		m_pSphereMap->setChecked(m_pOptions->GenerateSphereMap != vlFalse);
-		m_pStripAlpha->setChecked(m_pOptions->StripAlpha != vlFalse);
-		m_pSrgb->setChecked(m_pOptions->sRGB != vlFalse);
-		m_pNormalMap->setChecked(m_pOptions->NormalMap != vlFalse);
+		m_pReflectivity->setChecked(Options.ComputeReflectivity != vlFalse);
+		m_pThumbnail->setChecked(Options.GenerateThumbnail != vlFalse);
+		m_pSphereMap->setChecked(Options.GenerateSphereMap != vlFalse);
+		m_pStripAlpha->setChecked(Options.StripAlpha != vlFalse);
+		m_pSrgb->setChecked(Options.sRGB != vlFalse);
+		m_pNormalMap->setChecked(Options.NormalMap != vlFalse);
 
-		m_pDistanceAlpha->setChecked(m_pOptions->DistanceAlpha != vlFalse);
-		m_pDistanceAlphaSpread->setValue(m_pOptions->DistanceAlphaSpread);
-		const int iReduceIndex = m_pDistanceAlphaReduce->findData(static_cast<int>(m_pOptions->DistanceAlphaReduce));
+		m_pDistanceAlpha->setChecked(Options.DistanceAlpha != vlFalse);
+		m_pDistanceAlphaSpread->setValue(Options.DistanceAlphaSpread);
+		const int iReduceIndex = m_pDistanceAlphaReduce->findData(static_cast<int>(Options.DistanceAlphaReduce));
 		m_pDistanceAlphaReduce->setCurrentIndex(iReduceIndex >= 0 ? iReduceIndex : 0);
-		m_pDistanceAlphaThreshold->setValue(static_cast<int>(m_pOptions->DistanceAlphaThreshold));
+		m_pDistanceAlphaThreshold->setValue(static_cast<int>(Options.DistanceAlphaThreshold));
 
-		m_pGammaCorrection->setChecked(m_pOptions->CorrectGamma != vlFalse);
-		m_pGammaCorrectionValue->setValue(m_pOptions->GammaCorrection);
+		m_pGammaCorrection->setChecked(Options.CorrectGamma != vlFalse);
+		m_pGammaCorrectionValue->setValue(Options.GammaCorrection);
 
-		m_pLuminanceWeightR->setValue(m_pOptions->LuminanceWeightR);
-		m_pLuminanceWeightG->setValue(m_pOptions->LuminanceWeightG);
-		m_pLuminanceWeightB->setValue(m_pOptions->LuminanceWeightB);
+		m_pLuminanceWeightR->setValue(Options.LuminanceWeightR);
+		m_pLuminanceWeightG->setValue(Options.LuminanceWeightG);
+		m_pLuminanceWeightB->setValue(Options.LuminanceWeightB);
 
-		m_pCreateLODControlResource->setChecked(m_pOptions->CreateLODControlResource != vlFalse);
-		m_pLODControlClampU->setValue(static_cast<int>(m_pOptions->LODControlClampU));
-		m_pLODControlClampV->setValue(static_cast<int>(m_pOptions->LODControlClampV));
+		m_pCreateLODControlResource->setChecked(Options.CreateLODControlResource != vlFalse);
+		m_pLODControlClampU->setValue(static_cast<int>(Options.LODControlClampU));
+		m_pLODControlClampV->setValue(static_cast<int>(Options.LODControlClampV));
 
-		m_pCreateInformationResource->setChecked(m_pOptions->CreateInformationResource != vlFalse);
-		m_pInformationAuthor->setText(m_pOptions->InformationAuthor);
-		m_pInformationContact->setText(m_pOptions->InformationContact);
-		m_pInformationVersion->setText(m_pOptions->InformationVersion);
-		m_pInformationModification->setText(m_pOptions->InformationModification);
-		m_pInformationDescription->setText(m_pOptions->InformationDescription);
-		m_pInformationComments->setText(m_pOptions->InformationComments);
+		m_pCreateInformationResource->setChecked(Options.CreateInformationResource != vlFalse);
+		m_pInformationAuthor->setText(Options.InformationAuthor);
+		m_pInformationContact->setText(Options.InformationContact);
+		m_pInformationVersion->setText(Options.InformationVersion);
+		m_pInformationModification->setText(Options.InformationModification);
+		m_pInformationDescription->setText(Options.InformationDescription);
+		m_pInformationComments->setText(Options.InformationComments);
 	}
 
 	void VtfOptionsDialog::controlsToOptions()
 	{
-		m_pOptions->NormalFormat = m_pFormat->currentIndex() >= 0
+		controlsToOptions(*m_pOptions);
+	}
+
+	void VtfOptionsDialog::controlsToOptions(VtfOptions &Options) const
+	{
+		Options.NormalFormat = m_pFormat->currentIndex() >= 0
 			? NormalImageFormats[m_pFormat->currentIndex()].Format : IMAGE_FORMAT_NONE;
-		m_pOptions->AlphaFormat = m_pAlphaFormat->currentIndex() >= 0
+		Options.AlphaFormat = m_pAlphaFormat->currentIndex() >= 0
 			? AlphaImageFormats[m_pAlphaFormat->currentIndex()].Format : IMAGE_FORMAT_NONE;
-		m_pOptions->TextureType = static_cast<VtfTextureType>(m_pTextureType->currentIndex());
+		Options.TextureType = static_cast<VtfTextureType>(m_pTextureType->currentIndex());
 
-		m_pOptions->FlagClampS = m_pFlagClampS->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->FlagClampT = m_pFlagClampT->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->FlagNoLOD = m_pFlagNoLOD->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->FlagPointSample = m_pFlagPointSample->isChecked() ? vlTrue : vlFalse;
+		Options.FlagClampS = m_pFlagClampS->isChecked() ? vlTrue : vlFalse;
+		Options.FlagClampT = m_pFlagClampT->isChecked() ? vlTrue : vlFalse;
+		Options.FlagNoLOD = m_pFlagNoLOD->isChecked() ? vlTrue : vlFalse;
+		Options.FlagPointSample = m_pFlagPointSample->isChecked() ? vlTrue : vlFalse;
 
-		m_pOptions->ResizeImage = m_pResize->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->ResizeMethod = static_cast<VTFResizeMethod>(m_pResizeMethod->currentData().toInt());
-		m_pOptions->ResizeFilter = mipmapFilter(m_pResizeFilter);
-		m_pOptions->ResizeClamp = m_pResizeClamp->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->ResizeClampWidth = m_pMaximumWidth->currentText().toUInt();
-		m_pOptions->ResizeClampHeight = m_pMaximumHeight->currentText().toUInt();
+		Options.ResizeImage = m_pResize->isChecked() ? vlTrue : vlFalse;
+		Options.ResizeMethod = static_cast<VTFResizeMethod>(m_pResizeMethod->currentData().toInt());
+		Options.ResizeFilter = mipmapFilter(m_pResizeFilter);
+		Options.ResizeClamp = m_pResizeClamp->isChecked() ? vlTrue : vlFalse;
+		Options.ResizeClampWidth = m_pMaximumWidth->currentText().toUInt();
+		Options.ResizeClampHeight = m_pMaximumHeight->currentText().toUInt();
 
-		m_pOptions->GenerateMipmaps = m_pMipmaps->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->MipmapFilter = mipmapFilter(m_pMipmapFilter);
+		Options.GenerateMipmaps = m_pMipmaps->isChecked() ? vlTrue : vlFalse;
+		Options.MipmapFilter = mipmapFilter(m_pMipmapFilter);
 
-		m_pOptions->Version = m_pVersion->currentText();
+		Options.Version = m_pVersion->currentText();
 
 		switch(m_pCompressionLevel->currentIndex())
 		{
 		case 1:
-			m_pOptions->AuxCompressionLevel = VTF_AUX_COMPRESSION_LEVEL_DEFAULT;
+			Options.AuxCompressionLevel = VTF_AUX_COMPRESSION_LEVEL_DEFAULT;
 			break;
 		case -1:
 		case 0:
-			m_pOptions->AuxCompressionLevel = VTF_AUX_COMPRESSION_LEVEL_NONE;
+			Options.AuxCompressionLevel = VTF_AUX_COMPRESSION_LEVEL_NONE;
 			break;
 		default:
-			m_pOptions->AuxCompressionLevel = static_cast<vlShort>(m_pCompressionLevel->currentIndex() - 1);
+			Options.AuxCompressionLevel = static_cast<vlShort>(m_pCompressionLevel->currentIndex() - 1);
 			break;
 		}
-		m_pOptions->AuxCompressionMethod = m_pCompressionMethod->currentIndex() == 1
+		Options.AuxCompressionMethod = m_pCompressionMethod->currentIndex() == 1
 			? AUX_COMPRESSION_METHOD_ZSTD : AUX_COMPRESSION_METHOD_DEFLATE;
 
-		m_pOptions->ComputeReflectivity = m_pReflectivity->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->GenerateThumbnail = m_pThumbnail->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->GenerateSphereMap = m_pSphereMap->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->StripAlpha = m_pStripAlpha->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->sRGB = m_pSrgb->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->NormalMap = m_pNormalMap->isChecked() ? vlTrue : vlFalse;
+		Options.ComputeReflectivity = m_pReflectivity->isChecked() ? vlTrue : vlFalse;
+		Options.GenerateThumbnail = m_pThumbnail->isChecked() ? vlTrue : vlFalse;
+		Options.GenerateSphereMap = m_pSphereMap->isChecked() ? vlTrue : vlFalse;
+		Options.StripAlpha = m_pStripAlpha->isChecked() ? vlTrue : vlFalse;
+		Options.sRGB = m_pSrgb->isChecked() ? vlTrue : vlFalse;
+		Options.NormalMap = m_pNormalMap->isChecked() ? vlTrue : vlFalse;
 
-		m_pOptions->DistanceAlpha = m_pDistanceAlpha->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->DistanceAlphaSpread = static_cast<vlSingle>(m_pDistanceAlphaSpread->value());
-		m_pOptions->DistanceAlphaReduce = static_cast<vlUInt>(m_pDistanceAlphaReduce->currentData().toInt());
-		m_pOptions->DistanceAlphaThreshold = static_cast<vlUInt>(m_pDistanceAlphaThreshold->value());
+		Options.DistanceAlpha = m_pDistanceAlpha->isChecked() ? vlTrue : vlFalse;
+		Options.DistanceAlphaSpread = static_cast<vlSingle>(m_pDistanceAlphaSpread->value());
+		Options.DistanceAlphaReduce = static_cast<vlUInt>(m_pDistanceAlphaReduce->currentData().toInt());
+		Options.DistanceAlphaThreshold = static_cast<vlUInt>(m_pDistanceAlphaThreshold->value());
 
-		m_pOptions->CorrectGamma = m_pGammaCorrection->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->GammaCorrection = static_cast<vlSingle>(m_pGammaCorrectionValue->value());
+		Options.CorrectGamma = m_pGammaCorrection->isChecked() ? vlTrue : vlFalse;
+		Options.GammaCorrection = static_cast<vlSingle>(m_pGammaCorrectionValue->value());
 
-		m_pOptions->LuminanceWeightR = static_cast<vlSingle>(m_pLuminanceWeightR->value());
-		m_pOptions->LuminanceWeightG = static_cast<vlSingle>(m_pLuminanceWeightG->value());
-		m_pOptions->LuminanceWeightB = static_cast<vlSingle>(m_pLuminanceWeightB->value());
+		Options.LuminanceWeightR = static_cast<vlSingle>(m_pLuminanceWeightR->value());
+		Options.LuminanceWeightG = static_cast<vlSingle>(m_pLuminanceWeightG->value());
+		Options.LuminanceWeightB = static_cast<vlSingle>(m_pLuminanceWeightB->value());
 
-		m_pOptions->CreateLODControlResource = m_pCreateLODControlResource->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->LODControlClampU = static_cast<vlUInt>(m_pLODControlClampU->value());
-		m_pOptions->LODControlClampV = static_cast<vlUInt>(m_pLODControlClampV->value());
+		Options.CreateLODControlResource = m_pCreateLODControlResource->isChecked() ? vlTrue : vlFalse;
+		Options.LODControlClampU = static_cast<vlUInt>(m_pLODControlClampU->value());
+		Options.LODControlClampV = static_cast<vlUInt>(m_pLODControlClampV->value());
 
-		m_pOptions->CreateInformationResource = m_pCreateInformationResource->isChecked() ? vlTrue : vlFalse;
-		m_pOptions->InformationAuthor = m_pInformationAuthor->text();
-		m_pOptions->InformationContact = m_pInformationContact->text();
-		m_pOptions->InformationVersion = m_pInformationVersion->text();
-		m_pOptions->InformationModification = m_pInformationModification->text();
-		m_pOptions->InformationDescription = m_pInformationDescription->text();
-		m_pOptions->InformationComments = m_pInformationComments->text();
+		Options.CreateInformationResource = m_pCreateInformationResource->isChecked() ? vlTrue : vlFalse;
+		Options.InformationAuthor = m_pInformationAuthor->text();
+		Options.InformationContact = m_pInformationContact->text();
+		Options.InformationVersion = m_pInformationVersion->text();
+		Options.InformationModification = m_pInformationModification->text();
+		Options.InformationDescription = m_pInformationDescription->text();
+		Options.InformationComments = m_pInformationComments->text();
 	}
 }
