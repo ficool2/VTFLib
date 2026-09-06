@@ -145,9 +145,13 @@ VTFImageFormat StringToImageFormat(const vlChar *cString)
 	{
 		return IMAGE_FORMAT_BC7;
 	}
-	else if(stricmp(cString, "BC6H") == 0)
+	else if(stricmp(cString, "BC6H") == 0 || stricmp(cString, "BC6H_SIGNED") == 0)
 	{
 		return IMAGE_FORMAT_BC6H;
+	}
+	else if(stricmp(cString, "BC6H_UNSIGNED") == 0)
+	{
+		return IMAGE_FORMAT_BC6H_UNSIGNED;
 	}
 	else
 	{

@@ -880,6 +880,7 @@ namespace VTFEdit
 		const VTFImageFormat Format = m_pVTFFile->GetFormat();
 		const bool bHdr = Format == IMAGE_FORMAT_RGBA16161616F
 					   || Format == IMAGE_FORMAT_BC6H
+					   || Format == IMAGE_FORMAT_BC6H_UNSIGNED
 					   || VTFLib::CVTFFile::IsFloatFormat(Format) != vlFalse;
 
 		if(bMipmapChanged)
@@ -1031,6 +1032,7 @@ namespace VTFEdit
 
 		m_pHdrExposure->setEnabled(pVTFFile->GetFormat() == IMAGE_FORMAT_RGBA16161616F
 			|| pVTFFile->GetFormat() == IMAGE_FORMAT_BC6H
+			|| pVTFFile->GetFormat() == IMAGE_FORMAT_BC6H_UNSIGNED
 			|| VTFLib::CVTFFile::IsFloatFormat(pVTFFile->GetFormat()) != vlFalse);
 
 		const vlUInt uiFlags = pVTFFile->GetFlags();

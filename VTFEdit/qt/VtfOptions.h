@@ -32,7 +32,7 @@ namespace VTFEdit
 		bool bRequiresVersion76;	// Format was only added in VTF version 7.6.
 	};
 
-	static const int NormalImageFormatCount = 23;
+	static const int NormalImageFormatCount = 24;
 	static const int AlphaImageFormatCount = 16;
 
 	extern const ImageFormatEntry NormalImageFormats[NormalImageFormatCount];

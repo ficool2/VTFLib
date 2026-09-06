@@ -432,6 +432,7 @@ static CMP_FORMAT GetCMPFormat( VTFImageFormat imageFormat, bool bDXT5GA )
 	case IMAGE_FORMAT_BC5:				return CMP_FORMAT_BC5;
 	case IMAGE_FORMAT_BC7:				return CMP_FORMAT_BC7;
 	case IMAGE_FORMAT_BC6H:				return CMP_FORMAT_BC6H_SF;
+	case IMAGE_FORMAT_BC6H_UNSIGNED:	return CMP_FORMAT_BC6H;
 
 	default:							return CMP_FORMAT_Unknown;
 	}
@@ -441,7 +442,7 @@ static CMP_FORMAT GetCMPFormat( VTFImageFormat imageFormat, bool bDXT5GA )
 // an uncompressed HDR format rather than the usual RGBA8888
 static VTFImageFormat GetUncompressedFormat( VTFImageFormat CompressedFormat )
 {
-	return CompressedFormat == IMAGE_FORMAT_BC6H ? IMAGE_FORMAT_RGBA16161616F : IMAGE_FORMAT_RGBA8888;
+	return ( CompressedFormat == IMAGE_FORMAT_BC6H || CompressedFormat == IMAGE_FORMAT_BC6H_UNSIGNED ) ? IMAGE_FORMAT_RGBA16161616F : IMAGE_FORMAT_RGBA8888;
 }
 
 static const char *GetCMPErrorString( CMP_ERROR error )
@@ -3542,9 +3543,10 @@ static SVTFImageFormatInfo VTFImageFormatInfo[] =
 	{ "Reserved68",			  0,  0,  0,  0,  0,  0, vlFalse, vlFalse },		// 68
 	{ "R8",					  8,  1,  8,  0,  0,  0, vlFalse,  vlTrue },		// IMAGE_FORMAT_R8
 	{ "BC7",				  8,  0,  0,  0,  0,  8,  vlTrue,  vlTrue },		// IMAGE_FORMAT_BC7
-	{ "BC6H",				  8,  0, 16, 16, 16,  0,  vlTrue,  vlTrue },		// IMAGE_FORMAT_BC6H
+	{ "BC6H_SIGNED",		  8,  0, 16, 16, 16,  0,  vlTrue,  vlTrue },		// IMAGE_FORMAT_BC6H
 	{ "BC5",				  8,  0,  0,  0,  0,  0,  vlTrue,  vlTrue },		// IMAGE_FORMAT_BC5
-	{ "BC4",				  4,  0,  0,  0,  0,  0,  vlTrue,  vlTrue }			// IMAGE_FORMAT_BC4
+	{ "BC4",				  4,  0,  0,  0,  0,  0,  vlTrue,  vlTrue },		// IMAGE_FORMAT_BC4
+	{ "BC6H_UNSIGNED",		  8,  0, 16, 16, 16,  0,  vlTrue,  vlTrue }			// IMAGE_FORMAT_BC6H_UNSIGNED
 };
 
 SVTFImageFormatInfo const &CVTFFile::GetImageFormatInfo(VTFImageFormat ImageFormat)
@@ -3586,6 +3588,7 @@ vlUInt CVTFFile::ComputeImageSize(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiDept
 	case IMAGE_FORMAT_ATI2N:
 	case IMAGE_FORMAT_BC7:
 	case IMAGE_FORMAT_BC6H:
+	case IMAGE_FORMAT_BC6H_UNSIGNED:
 	case IMAGE_FORMAT_BC5:
 		if(uiWidth < 4 && uiWidth > 0)
 			uiWidth = 4;
@@ -3916,7 +3919,7 @@ vlBool CVTFFile::CompressDXTn(vlByte *lpSource, vlByte *lpDest, vlUInt uiWidth, 
 	// BC7 and BC6H at maximum quality are exhaustive and extremely slow
 	if(DestFormat == IMAGE_FORMAT_BC7)
 		options.fquality  = 0.1f;
-	else if(DestFormat == IMAGE_FORMAT_BC6H)
+	else if(DestFormat == IMAGE_FORMAT_BC6H || DestFormat == IMAGE_FORMAT_BC6H_UNSIGNED)
 		options.fquality  = 0.05f;
 	else
 		options.fquality  = 1.0f;
@@ -4166,7 +4169,8 @@ static SVTFImageConvertInfo VTFImageConvertInfo[] =
 	{	  8,  0,  0,  0,  0,  8,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC7},
 	{	  8,  0, 16, 16, 16,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC6H},
 	{	  8,  0,  0,  0,  0,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC5},
-	{	  4,  0,  0,  0,  0,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC4}
+	{	  4,  0,  0,  0,  0,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC4},
+	{	  8,  0, 16, 16, 16,  0,	-1,	-1,	-1,	-1,  vlTrue,  vlTrue,	NULL,	NULL,		IMAGE_FORMAT_BC6H_UNSIGNED}
 };
 
 // Mask for a channel of uiBitsPerPixel bits

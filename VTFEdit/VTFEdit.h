@@ -2445,7 +2445,7 @@ namespace VTFEdit
 				this->numAnimateFPS->Enabled = true;
 			}
 
-			if(VTFFile->GetFormat() == IMAGE_FORMAT_RGBA16161616F || VTFFile->GetFormat() == IMAGE_FORMAT_BC6H)
+			if(VTFFile->GetFormat() == IMAGE_FORMAT_RGBA16161616F || VTFFile->GetFormat() == IMAGE_FORMAT_BC6H || VTFFile->GetFormat() == IMAGE_FORMAT_BC6H_UNSIGNED)
 			{
 				this->trkHDRExposure->Enabled = true;
 			}

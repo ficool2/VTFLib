@@ -36,7 +36,7 @@ namespace VTFEdit
 		IMAGE_FORMAT_RGB888, IMAGE_FORMAT_BGR888, IMAGE_FORMAT_RGB565, IMAGE_FORMAT_I8, IMAGE_FORMAT_P8,
 		IMAGE_FORMAT_RGB888_BLUESCREEN, IMAGE_FORMAT_BGR888_BLUESCREEN, IMAGE_FORMAT_DXT1, IMAGE_FORMAT_BGRX8888,
 		IMAGE_FORMAT_BGR565, IMAGE_FORMAT_BGRX5551, IMAGE_FORMAT_UV88, IMAGE_FORMAT_UVLX8888, IMAGE_FORMAT_R8,
-		IMAGE_FORMAT_BC6H
+		IMAGE_FORMAT_BC6H, IMAGE_FORMAT_BC6H_UNSIGNED
 	};
 
 	// Formats with an alpha channel.
@@ -400,9 +400,9 @@ private: System::Windows::Forms::CheckBox^ chkStripAlpha;
 			// 
 			this->cboFormat->DropDownStyle = System::Windows::Forms::ComboBoxStyle::DropDownList;
 			this->cboFormat->Font = (gcnew System::Drawing::Font(L"Microsoft Sans Serif", 8));
-			this->cboFormat->Items->AddRange(gcnew cli::array< System::Object^  >(15) {
+			this->cboFormat->Items->AddRange(gcnew cli::array< System::Object^  >(16) {
 				L"RGB888", L"BGR888", L"RGB565", L"I8", L"P8 (Not supported)", L"RGB888 Bluescreen", L"BGR888 Bluescreen",
-					L"DXT1", L"BGRX8888", L"BGR565", L"BGRX5551", L"UV88", L"UVLX8888", L"R8", L"BC6H"
+					L"DXT1", L"BGRX8888", L"BGR565", L"BGRX5551", L"UV88", L"UVLX8888", L"R8", L"BC6H", L"BC6H Unsigned"
 			});
 			this->cboFormat->Location = System::Drawing::Point(125, 28);
 			this->cboFormat->Name = L"cboFormat";

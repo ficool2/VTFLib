@@ -122,6 +122,7 @@ typedef enum tagVTFImageFormat
 	IMAGE_FORMAT_BC6H = 71,					//!<  = BC6H compressed format (signed half-float) - 8 bpp
 	IMAGE_FORMAT_BC5 = 72,					//!<  = BC5 compressed format - 8 bpp
 	IMAGE_FORMAT_BC4 = 73,					//!<  = BC4 compressed format - 4 bpp)
+	IMAGE_FORMAT_BC6H_UNSIGNED = 74,		//!<  = BC6H compressed format (unsigned half-float) - 8 bpp
 	IMAGE_FORMAT_COUNT,
 	IMAGE_FORMAT_NONE = -1
 } VTFImageFormat;
