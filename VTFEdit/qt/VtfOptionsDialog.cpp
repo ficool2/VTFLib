@@ -690,7 +690,14 @@ namespace VTFEdit
 
 	void VtfOptionsDialog::updateEnabledState()
 	{
-		m_pSphereMap->setEnabled(static_cast<VtfTextureType>(m_pTextureType->currentIndex()) == VtfTextureType::EnvironmentMap);
+		// Sphere maps are 7.1 - 7.4 only
+		const QString sVersion = m_pVersion->currentText();
+		const bool bSupportsSphereMap = sVersion != QLatin1String("7.0")  // hack this is terrible
+									 && sVersion != QLatin1String("7.5") 
+									 && sVersion != QLatin1String("7.6");
+
+		m_pSphereMap->setEnabled(bSupportsSphereMap
+			&& static_cast<VtfTextureType>(m_pTextureType->currentIndex()) == VtfTextureType::EnvironmentMap);
 
 		const bool bAlphaFormat = !m_pStripAlpha->isChecked();
 		m_pAlphaFormat->setEnabled(bAlphaFormat);

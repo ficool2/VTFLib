@@ -206,7 +206,7 @@ namespace VTFEdit
 				Options.TextureType = VtfTextureType::EnvironmentMap;
 				Options.GenerateSphereMap = vlTrue;
 				add(QStringLiteral("Environment Map (Cubemap)"),
-					QStringLiteral("Cubemap built from six faces (plus spheremap on Version 7.4 or lower)"),
+					QStringLiteral("Cubemap built from six faces (plus spheremap on Version 7.1 - 7.4)"),
 					Options);
 			}
 

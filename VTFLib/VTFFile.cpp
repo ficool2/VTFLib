@@ -535,6 +535,15 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 		return vlFalse;
 	}
 
+	vlBool bSphereMap = VTFCreateOptions.bSphereMap && uiFaces == 6;
+
+	if(bSphereMap && VTFCreateOptions.uiVersion[0] == VTF_MAJOR_VERSION
+		&& (VTFCreateOptions.uiVersion[1] < VTF_MINOR_VERSION_MIN_SPHERE_MAP
+			|| VTFCreateOptions.uiVersion[1] >= VTF_MINOR_VERSION_MIN_NO_SPHERE_MAP))
+	{
+		bSphereMap = vlFalse;
+	}
+
 	if(VTFCreateOptions.bMipmaps && uiSlices > 1)
 	{
 		LastError.Set("Mipmap generation for depth textures is not supported.");
@@ -667,7 +676,7 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 		}
 
 		// Create image (allocate and setup structures).
-		if(!this->Create(uiWidth, uiHeight, uiFrames, uiFaces + (VTFCreateOptions.bSphereMap && uiFaces == 6 ? 1 : 0), uiSlices, VTFCreateOptions.ImageFormat, VTFCreateOptions.bThumbnail, VTFCreateOptions.bMipmaps, vlFalse))
+		if(!this->Create(uiWidth, uiHeight, uiFrames, uiFaces + (bSphereMap ? 1 : 0), uiSlices, VTFCreateOptions.ImageFormat, VTFCreateOptions.bThumbnail, VTFCreateOptions.bMipmaps, vlFalse))
 		{
 			throw 0;
 		}
@@ -801,7 +810,7 @@ vlBool CVTFFile::Create(vlUInt uiWidth, vlUInt uiHeight, vlUInt uiFrames, vlUInt
 			}
 		}
 
-		if(VTFCreateOptions.bSphereMap && uiFaces == 6)
+		if(bSphereMap)
 		{
 			if(!this->GenerateSphereMap())
 			{
