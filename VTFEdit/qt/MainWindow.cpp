@@ -171,6 +171,191 @@ namespace VTFEdit
 			return false;
 		}
 
+		void RotateFaceLeft(vlByte *lpFace, vlUInt uiSize, size_t uiPixelSize)
+		{
+			const size_t uiFaceSize = static_cast<size_t>(uiSize) * uiSize * uiPixelSize;
+
+			std::vector<vlByte> Source(lpFace, lpFace + uiFaceSize);
+
+			for(vlUInt y = 0; y < uiSize; y++)
+			{
+				for(vlUInt x = 0; x < uiSize; x++)
+				{
+					const size_t uiSourceIndex =
+						(static_cast<size_t>(uiSize - 1 - y) + static_cast<size_t>(x) * uiSize) * uiPixelSize;
+
+					memcpy(lpFace + (static_cast<size_t>(x) + static_cast<size_t>(y) * uiSize) * uiPixelSize,
+						&Source[uiSourceIndex], uiPixelSize);
+				}
+			}
+		}
+
+		void RotateFace180(vlByte *lpFace, vlUInt uiSize, size_t uiPixelSize)
+		{
+			RotateFaceLeft(lpFace, uiSize, uiPixelSize);
+			RotateFaceLeft(lpFace, uiSize, uiPixelSize);
+		}
+
+		void FlipFaceVertically(vlByte *lpFace, vlUInt uiSize, size_t uiPixelSize)
+		{
+			const size_t uiRowSize = static_cast<size_t>(uiSize) * uiPixelSize;
+
+			std::vector<vlByte> Row(uiRowSize);
+
+			for(vlUInt y = 0; y < uiSize / 2; y++)
+			{
+				vlByte *lpTop = lpFace + static_cast<size_t>(y) * uiRowSize;
+				vlByte *lpBottom = lpFace + static_cast<size_t>(uiSize - 1 - y) * uiRowSize;
+
+				memcpy(&Row[0], lpTop, uiRowSize);
+				memcpy(lpTop, lpBottom, uiRowSize);
+				memcpy(lpBottom, &Row[0], uiRowSize);
+			}
+		}
+
+		void FlipFaceHorizontally(vlByte *lpFace, vlUInt uiSize, size_t uiPixelSize)
+		{
+			const size_t uiRowSize = static_cast<size_t>(uiSize) * uiPixelSize;
+
+			std::vector<vlByte> Pixel(uiPixelSize);
+
+			for(vlUInt y = 0; y < uiSize; y++)
+			{
+				vlByte *lpRow = lpFace + static_cast<size_t>(y) * uiRowSize;
+
+				for(vlUInt x = 0; x < uiSize / 2; x++)
+				{
+					vlByte *lpLeft = lpRow + static_cast<size_t>(x) * uiPixelSize;
+					vlByte *lpRight = lpRow + static_cast<size_t>(uiSize - 1 - x) * uiPixelSize;
+
+					memcpy(&Pixel[0], lpLeft, uiPixelSize);
+					memcpy(lpLeft, lpRight, uiPixelSize);
+					memcpy(lpRight, &Pixel[0], uiPixelSize);
+				}
+			}
+		}
+
+		// fixup to material system orientation
+		void FixupCubemapOrientation(const std::vector<vlByte *> &vImageData,
+			vlUInt uiWidth, vlUInt uiHeight, size_t uiPixelSize)
+		{
+			// juuuust in case
+			if(uiWidth != uiHeight || uiWidth == 0)
+			{
+				return;
+			}
+
+			// ignore spheremap
+			const size_t uiFaces = qMin<size_t>(vImageData.size(), 6);
+
+			for(size_t i = 0; i < uiFaces; i++)
+			{
+				vlByte *lpFace = vImageData[i];
+
+				switch(i)
+				{
+				case 0: // rt (+x)
+					RotateFaceLeft(lpFace, uiWidth, uiPixelSize);
+					FlipFaceVertically(lpFace, uiWidth, uiPixelSize);
+					break;
+				case 1: // lf (-x)
+					RotateFaceLeft(lpFace, uiWidth, uiPixelSize);
+					FlipFaceHorizontally(lpFace, uiWidth, uiPixelSize);
+					break;
+				case 2: // bk (+y)
+					RotateFace180(lpFace, uiWidth, uiPixelSize);
+					FlipFaceHorizontally(lpFace, uiWidth, uiPixelSize);
+					break;
+				case 3: // ft (-y)
+					FlipFaceHorizontally(lpFace, uiWidth, uiPixelSize);
+					break;
+				case 4: // up (+z)
+					RotateFaceLeft(lpFace, uiWidth, uiPixelSize);
+					FlipFaceVertically(lpFace, uiWidth, uiPixelSize);
+					break;
+				case 5: // dn (-z)
+					FlipFaceHorizontally(lpFace, uiWidth, uiPixelSize);
+					RotateFaceLeft(lpFace, uiWidth, uiPixelSize);
+					break;
+				}
+			}
+		}
+
+		bool SortCubemapFaces(QStringList &sFileNames)
+		{
+			static const char *const szSuffixes[] = { "rt", "lf", "bk", "ft", "up", "dn" };
+			const int iFaces = static_cast<int>(sizeof(szSuffixes) / sizeof(szSuffixes[0]));
+
+			if(sFileNames.count() != iFaces && sFileNames.count() != iFaces + 1)
+			{
+				return false;
+			}
+
+			QStringList sSorted;
+			for(int i = 0; i < iFaces; i++)
+			{
+				sSorted.append(QString());
+			}
+
+			QStringList sUnmatched;
+
+			for(const QString &sFileName : sFileNames)
+			{
+				QString sBaseName = QFileInfo(sFileName).completeBaseName();
+
+				// catch frame number for animated cubemaps
+				while(!sBaseName.isEmpty() && sBaseName.at(sBaseName.length() - 1).isDigit())
+				{
+					sBaseName.chop(1);
+				}
+
+				int iFace = -1;
+				for(int i = 0; i < iFaces; i++)
+				{
+					const QLatin1String sSuffix(szSuffixes[i]);
+					if(!sBaseName.endsWith(sSuffix, Qt::CaseInsensitive))
+					{
+						continue;
+					}
+
+					iFace = i;
+					break;
+				}
+
+				if(iFace < 0)
+				{
+					sUnmatched.append(sFileName);
+				}
+				else if(!sSorted[iFace].isEmpty())
+				{
+					return false;
+				}
+				else
+				{
+					sSorted[iFace] = sFileName;
+				}
+			}
+
+			for(const QString &sFileName : sSorted)
+			{
+				if(sFileName.isEmpty())
+				{
+					return false;
+				}
+			}
+
+			// might have spheremap
+			if(sUnmatched.count() > 1)
+			{
+				return false;
+			}
+
+			sSorted.append(sUnmatched);
+			sFileNames = sSorted;
+
+			return true;
+		}
+
 		bool IsSupportedFileName(const QString &sFileName)
 		{
 			return sFileName.endsWith(QLatin1String(".vtf"), Qt::CaseInsensitive)
@@ -2383,7 +2568,7 @@ namespace VTFEdit
 		return save(iIndex, sFileName);
 	}
 
-	void MainWindow::import(const QStringList &sFileNames)
+	void MainWindow::import(const QStringList &sFileNamesIn)
 	{
 		if(m_pOptionsDialog == nullptr)
 		{
@@ -2393,6 +2578,13 @@ namespace VTFEdit
 		if(m_pOptionsDialog->exec() != QDialog::Accepted)
 		{
 			return;
+		}
+
+		QStringList sFileNames = sFileNamesIn;
+
+		if(m_Options.TextureType == VtfTextureType::EnvironmentMap)
+		{
+			SortCubemapFaces(sFileNames);
 		}
 
 		bool bError = false;
@@ -2476,6 +2668,13 @@ namespace VTFEdit
 
 			// Leave the base image bound for the next file.
 			ilBindImage(uiImage);
+		}
+
+		if(!bError && m_Options.TextureType == VtfTextureType::EnvironmentMap
+			&& (vImageData.size() == 6 || vImageData.size() == 7))
+		{
+			FixupCubemapOrientation(vImageData, uiWidth, uiHeight,
+				bFloat ? 4 * sizeof(vlSingle) : 4);
 		}
 
 		if(!bError && m_Options.DistanceAlpha && !bFloat && !vImageData.empty())
