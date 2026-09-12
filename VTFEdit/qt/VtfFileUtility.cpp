@@ -155,6 +155,8 @@ namespace VTFEdit
 			VTFCreateOptions.bResizeClamp = Options.ResizeClamp;
 			VTFCreateOptions.uiResizeClampWidth = Options.ResizeClampWidth;
 			VTFCreateOptions.uiResizeClampHeight = Options.ResizeClampHeight;
+			VTFCreateOptions.uiResizeWidth = Options.ResizeClampWidth;
+			VTFCreateOptions.uiResizeHeight = Options.ResizeClampHeight;
 			VTFCreateOptions.bGammaCorrection = Options.CorrectGamma;
 			VTFCreateOptions.sGammaCorrection = Options.GammaCorrection;
 			VTFCreateOptions.bMipmaps = Options.GenerateMipmaps;

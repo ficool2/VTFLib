@@ -17,6 +17,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
+#include <QIntValidator>
 #include "VtfOptionsDialog.h"
 
 #include <QCheckBox>
@@ -55,6 +56,7 @@ namespace VTFEdit
 			{ "Nearest Multiple Of 4", RESIZE_NEAREST_MULTIPLE4 },
 			{ "Biggest Multiple Of 4", RESIZE_BIGGEST_MULTIPLE4 },
 			{ "Smallest Multiple Of 4", RESIZE_SMALLEST_MULTIPLE4 },
+			{ "Custom Size", RESIZE_SET },
 		};
 		struct MipmapFilterEntry
 		{
@@ -182,6 +184,7 @@ namespace VTFEdit
 
 		connect(m_pStripAlpha, &QCheckBox::toggled, this, &VtfOptionsDialog::updateEnabledState);
 		connect(m_pResize, &QCheckBox::toggled, this, &VtfOptionsDialog::updateEnabledState);
+		connect(m_pResizeMethod, qOverload<int>(&QComboBox::currentIndexChanged), this, &VtfOptionsDialog::updateEnabledState);
 		connect(m_pResizeClamp, &QCheckBox::toggled, this, &VtfOptionsDialog::updateEnabledState);
 		connect(m_pMipmaps, &QCheckBox::toggled, this, &VtfOptionsDialog::updateEnabledState);
 		connect(m_pGammaCorrection, &QCheckBox::toggled, this, &VtfOptionsDialog::updateEnabledState);
@@ -494,16 +497,20 @@ namespace VTFEdit
 		m_pResizeClamp = new QCheckBox(tr("Clamp resize dimensions"), pResize);
 		m_pMaximumWidth = new QComboBox(pResize);
 		m_pMaximumWidth->addItems(powerOfTwoList());
-		m_pMaximumWidth->setToolTip(tr("Maximum width."));
+		m_pMaximumWidth->setEditable(true);
+		m_pMaximumWidth->setValidator(new QIntValidator(1, 65535, m_pMaximumWidth));
+		m_pMaximumWidth->setToolTip(tr("Maximum width, or the exact width when using Custom Size."));
 		m_pMaximumHeight = new QComboBox(pResize);
 		m_pMaximumHeight->addItems(powerOfTwoList());
-		m_pMaximumHeight->setToolTip(tr("Maximum height."));
+		m_pMaximumHeight->setEditable(true);
+		m_pMaximumHeight->setValidator(new QIntValidator(1, 65535, m_pMaximumHeight));
+		m_pMaximumHeight->setToolTip(tr("Maximum height, or the exact height when using Custom Size."));
 		pResizeForm->addRow(m_pResize);
 		pResizeForm->addRow(tr("Resize Method:"), m_pResizeMethod);
 		pResizeForm->addRow(tr("Resize Filter:"), m_pResizeFilter);
 		pResizeForm->addRow(m_pResizeClamp);
-		pResizeForm->addRow(tr("Maximum Width:"), m_pMaximumWidth);
-		pResizeForm->addRow(tr("Maximum Height:"), m_pMaximumHeight);
+		pResizeForm->addRow(tr("Width:"), m_pMaximumWidth);
+		pResizeForm->addRow(tr("Height:"), m_pMaximumHeight);
 
 		QGroupBox *pMipmaps = new QGroupBox(tr("Mipmaps:"), pTab);
 		QFormLayout *pMipmapsForm = new QFormLayout(pMipmaps);
@@ -706,9 +713,10 @@ namespace VTFEdit
 
 		m_pResizeMethod->setEnabled(m_pResize->isChecked());
 		m_pResizeFilter->setEnabled(m_pResize->isChecked());
-		m_pResizeClamp->setEnabled(m_pResize->isChecked());
-		m_pMaximumWidth->setEnabled(m_pResize->isChecked() && m_pResizeClamp->isChecked());
-		m_pMaximumHeight->setEnabled(m_pResize->isChecked() && m_pResizeClamp->isChecked());
+		const bool bCustomSize = static_cast<VTFResizeMethod>(m_pResizeMethod->currentData().toInt()) == RESIZE_SET;
+		m_pResizeClamp->setEnabled(m_pResize->isChecked() && !bCustomSize);
+		m_pMaximumWidth->setEnabled(m_pResize->isChecked() && (bCustomSize || m_pResizeClamp->isChecked()));
+		m_pMaximumHeight->setEnabled(m_pResize->isChecked() && (bCustomSize || m_pResizeClamp->isChecked()));
 
 		m_pMipmapFilter->setEnabled(m_pMipmaps->isChecked());
 
@@ -774,10 +782,8 @@ namespace VTFEdit
 		setMipmapFilter(m_pResizeFilter, Options.ResizeFilter);
 		m_pResizeClamp->setChecked(Options.ResizeClamp != vlFalse);
 
-		const int iWidthIndex = m_pMaximumWidth->findText(QString::number(Options.ResizeClampWidth));
-		m_pMaximumWidth->setCurrentIndex(iWidthIndex >= 0 ? iWidthIndex : m_pMaximumWidth->count() - 1);
-		const int iHeightIndex = m_pMaximumHeight->findText(QString::number(Options.ResizeClampHeight));
-		m_pMaximumHeight->setCurrentIndex(iHeightIndex >= 0 ? iHeightIndex : m_pMaximumHeight->count() - 1);
+		m_pMaximumWidth->setCurrentText(QString::number(Options.ResizeClampWidth));
+		m_pMaximumHeight->setCurrentText(QString::number(Options.ResizeClampHeight));
 
 		m_pMipmaps->setChecked(Options.GenerateMipmaps != vlFalse);
 		setMipmapFilter(m_pMipmapFilter, Options.MipmapFilter);
@@ -856,8 +862,8 @@ namespace VTFEdit
 		Options.ResizeMethod = static_cast<VTFResizeMethod>(m_pResizeMethod->currentData().toInt());
 		Options.ResizeFilter = mipmapFilter(m_pResizeFilter);
 		Options.ResizeClamp = m_pResizeClamp->isChecked() ? vlTrue : vlFalse;
-		Options.ResizeClampWidth = m_pMaximumWidth->currentText().toUInt();
-		Options.ResizeClampHeight = m_pMaximumHeight->currentText().toUInt();
+		Options.ResizeClampWidth = qMax(1u, m_pMaximumWidth->currentText().toUInt());
+		Options.ResizeClampHeight = qMax(1u, m_pMaximumHeight->currentText().toUInt());
 
 		Options.GenerateMipmaps = m_pMipmaps->isChecked() ? vlTrue : vlFalse;
 		Options.MipmapFilter = mipmapFilter(m_pMipmapFilter);
