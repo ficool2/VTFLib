@@ -2677,6 +2677,11 @@ namespace VTFEdit
 				bFloat ? 4 * sizeof(vlSingle) : 4);
 		}
 
+		if(!bError && m_Options.Dilate && !m_Options.StripAlpha && !vImageData.empty())
+		{
+			VtfFileUtility::ApplyDilation(vImageData, uiWidth, uiHeight, bFloat);
+		}
+
 		if(!bError && m_Options.DistanceAlpha && !bFloat && !vImageData.empty())
 		{
 			VtfFileUtility::ApplyDistanceAlpha(vImageData, uiWidth, uiHeight, m_Options);
@@ -3226,6 +3231,11 @@ namespace VTFEdit
 			&& VtfFileUtility::HasAlphaData(lpImageData, uiWidth, uiHeight);
 
 		std::vector<vlByte *> vImageData{ lpImageData };
+
+		if(m_Options.Dilate && !m_Options.StripAlpha)
+		{
+			VtfFileUtility::ApplyDilation(vImageData, uiWidth, uiHeight, false);
+		}
 
 		if(m_Options.DistanceAlpha)
 		{
@@ -3960,6 +3970,8 @@ namespace VTFEdit
 				m_Options.FlagPointSample = toBool(sVal);
 			else if(sArg.compare(QLatin1String("VTFOptions.StripAlpha"), Qt::CaseInsensitive) == 0)
 				m_Options.StripAlpha = toBool(sVal);
+			else if(sArg.compare(QLatin1String("VTFOptions.Dilate"), Qt::CaseInsensitive) == 0)
+				m_Options.Dilate = toBool(sVal);
 			else if(sArg.compare(QLatin1String("VTFOptions.sRGB"), Qt::CaseInsensitive) == 0)
 				m_Options.sRGB = toBool(sVal);
 			else if(sArg.compare(QLatin1String("VTFOptions.NormalMap"), Qt::CaseInsensitive) == 0)
@@ -4133,6 +4145,7 @@ namespace VTFEdit
 		Stream << "VTFOptions.FlagNoLOD = " << boolText(m_Options.FlagNoLOD != vlFalse) << "\n";
 		Stream << "VTFOptions.FlagPointSample = " << boolText(m_Options.FlagPointSample != vlFalse) << "\n";
 		Stream << "VTFOptions.StripAlpha = " << boolText(m_Options.StripAlpha != vlFalse) << "\n";
+		Stream << "VTFOptions.Dilate = " << boolText(m_Options.Dilate != vlFalse) << "\n";
 		Stream << "VTFOptions.sRGB = " << boolText(m_Options.sRGB != vlFalse) << "\n";
 		Stream << "VTFOptions.NormalMap = " << boolText(m_Options.NormalMap != vlFalse) << "\n";
 		Stream << "VTFOptions.DistanceAlpha = " << boolText(m_Options.DistanceAlpha != vlFalse) << "\n";

@@ -100,6 +100,7 @@ namespace VTFEdit
 		GenerateThumbnail = vlTrue;
 		GenerateSphereMap = vlTrue;
 		StripAlpha = vlFalse;
+		Dilate = vlFalse;
 		sRGB = vlTrue;
 		NormalMap = vlFalse;
 

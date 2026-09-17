@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <type_traits>
 #include <vector>
 
 namespace VTFEdit
@@ -86,6 +87,116 @@ namespace VTFEdit
 			}
 
 			return false;
+		}
+
+		template <typename T>
+		void dilateFrame(T *lpData, vlUInt uiWidth, vlUInt uiHeight, T Transparent)
+		{
+			const size_t uiCount = static_cast<size_t>(uiWidth) * uiHeight;
+
+			std::vector<vlByte> vFilled(uiCount);
+			bool bAnyFilled = false, bAnyEmpty = false;
+			for(size_t i = 0; i < uiCount; i++)
+			{
+				vFilled[i] = lpData[i * 4 + 3] > Transparent ? 1 : 0;
+				bAnyFilled = bAnyFilled || vFilled[i];
+				bAnyEmpty = bAnyEmpty || !vFilled[i];
+			}
+
+			if(!bAnyFilled || !bAnyEmpty)
+			{
+				return;
+			}
+
+			const auto forNeighbours = [uiWidth, uiHeight](size_t i, auto &&Func)
+			{
+				int x = static_cast<int>(i % uiWidth), y = static_cast<int>(i / uiWidth);
+				for(int dy = -1; dy <= 1; dy++)
+				{
+					for(int dx = -1; dx <= 1; dx++)
+					{
+						int nx = x + dx, ny = y + dy;
+						if((dx != 0 || dy != 0) && nx >= 0 && ny >= 0
+							&& nx < static_cast<int>(uiWidth) && ny < static_cast<int>(uiHeight))
+						{
+							Func(static_cast<size_t>(ny) * uiWidth + nx);
+						}
+					}
+				}
+			};
+
+			// grow outwards a ring at a time
+			std::vector<size_t> vFrontier;
+			for(size_t i = 0; i < uiCount; i++)
+			{
+				if(vFilled[i] != 1)
+				{
+					continue;
+				}
+				forNeighbours(i, [&](size_t n)
+				{
+					if(vFilled[n] == 0)
+					{
+						vFilled[n] = 2;
+						vFrontier.push_back(n);
+					}
+				});
+			}
+
+			std::vector<size_t> vNext;
+			while(!vFrontier.empty())
+			{
+				for(size_t i : vFrontier)
+				{
+					double dSum[3] = { 0.0, 0.0, 0.0 };
+					int iSamples = 0;
+					forNeighbours(i, [&](size_t n)
+					{
+						if(vFilled[n] == 1)
+						{
+							for(int c = 0; c < 3; c++)
+								dSum[c] += lpData[n * 4 + c];
+							iSamples++;
+						}
+					});
+
+					for(int c = 0; c < 3; c++)
+					{
+						double dValue = dSum[c] / iSamples;
+						lpData[i * 4 + c] = std::is_floating_point<T>::value
+							? static_cast<T>(dValue) : static_cast<T>(dValue + 0.5);
+					}
+				}
+
+				vNext.clear();
+				for(size_t i : vFrontier)
+				{
+					vFilled[i] = 1;
+				}
+				for(size_t i : vFrontier)
+				{
+					forNeighbours(i, [&](size_t n)
+					{
+						if(vFilled[n] == 0)
+						{
+							vFilled[n] = 2;
+							vNext.push_back(n);
+						}
+					});
+				}
+				vFrontier.swap(vNext);
+			}
+		}
+
+		void ApplyDilation(std::vector<vlByte *> &vImageData, vlUInt uiWidth, vlUInt uiHeight, bool bFloat)
+		{
+			for(vlByte *lpFrameData : vImageData)
+			{
+				if(bFloat)
+					dilateFrame(reinterpret_cast<vlSingle *>(lpFrameData), uiWidth, uiHeight, 0.0f);
+				else
+					dilateFrame(lpFrameData, uiWidth, uiHeight, static_cast<vlByte>(0));
+			}
 		}
 
 		bool ApplyDistanceAlpha(std::vector<vlByte *> &vImageData, vlUInt &uiWidth, vlUInt &uiHeight, const VtfOptions &Options)

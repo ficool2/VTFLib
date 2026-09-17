@@ -175,6 +175,7 @@ namespace VTFEdit
 				Options.FlagClampS = vlTrue;
 				Options.FlagClampT = vlTrue;
 				Options.FlagNoLOD = vlTrue;
+				Options.Dilate = vlTrue;
 				add(QStringLiteral("UI Icon"),
 					QStringLiteral("Uncompressed and unfiltered, no mipmaps, no LOD and clamped."),
 					Options);
@@ -426,6 +427,7 @@ namespace VTFEdit
 		Options.GenerateThumbnail = From.GenerateThumbnail;
 		Options.GenerateSphereMap = From.GenerateSphereMap;
 		Options.StripAlpha = From.StripAlpha;
+		Options.Dilate = From.Dilate;
 		Options.sRGB = From.sRGB;
 		Options.NormalMap = From.NormalMap;
 
@@ -475,6 +477,7 @@ namespace VTFEdit
 			&& (A.GenerateThumbnail != vlFalse) == (B.GenerateThumbnail != vlFalse)
 			&& (A.GenerateSphereMap != vlFalse) == (B.GenerateSphereMap != vlFalse)
 			&& (A.StripAlpha != vlFalse) == (B.StripAlpha != vlFalse)
+			&& (A.Dilate != vlFalse) == (B.Dilate != vlFalse)
 			&& (A.sRGB != vlFalse) == (B.sRGB != vlFalse)
 			&& (A.NormalMap != vlFalse) == (B.NormalMap != vlFalse)
 
@@ -625,6 +628,8 @@ namespace VTFEdit
 				Options.GenerateSphereMap = toBool(sVal);
 			else if(sArg.compare(QLatin1String("Preset.StripAlpha"), Qt::CaseInsensitive) == 0)
 				Options.StripAlpha = toBool(sVal);
+			else if(sArg.compare(QLatin1String("Preset.Dilate"), Qt::CaseInsensitive) == 0)
+				Options.Dilate = toBool(sVal);
 			else if(sArg.compare(QLatin1String("Preset.sRGB"), Qt::CaseInsensitive) == 0)
 				Options.sRGB = toBool(sVal);
 			else if(sArg.compare(QLatin1String("Preset.NormalMap"), Qt::CaseInsensitive) == 0)
@@ -758,6 +763,7 @@ namespace VTFEdit
 			Stream << "Preset.GenerateThumbnail = " << boolText(Options.GenerateThumbnail != vlFalse) << "\n";
 			Stream << "Preset.GenerateSphereMap = " << boolText(Options.GenerateSphereMap != vlFalse) << "\n";
 			Stream << "Preset.StripAlpha = " << boolText(Options.StripAlpha != vlFalse) << "\n";
+			Stream << "Preset.Dilate = " << boolText(Options.Dilate != vlFalse) << "\n";
 			Stream << "Preset.sRGB = " << boolText(Options.sRGB != vlFalse) << "\n";
 			Stream << "Preset.NormalMap = " << boolText(Options.NormalMap != vlFalse) << "\n";
 

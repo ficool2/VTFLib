@@ -111,6 +111,7 @@ namespace VTFEdit
 		QCheckBox *m_pReflectivity;
 		QCheckBox *m_pThumbnail;
 		QCheckBox *m_pSphereMap;
+		QCheckBox *m_pDilate;
 		QCheckBox *m_pStripAlpha;
 
 		QCheckBox *m_pDistanceAlpha;

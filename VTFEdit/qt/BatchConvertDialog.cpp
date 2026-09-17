@@ -348,6 +348,11 @@ namespace VTFEdit
 					// Leave the base image bound for the next file.
 					ilBindImage(uiImage);
 
+					if(!bError && !vImageData.empty() && m_pOptions->Dilate && !m_pOptions->StripAlpha)
+					{
+						VtfFileUtility::ApplyDilation(vImageData, uiWidth, uiHeight, bFloat);
+					}
+
 					if(!bError && !vImageData.empty() && m_pOptions->DistanceAlpha && !bFloat)
 					{
 						VtfFileUtility::ApplyDistanceAlpha(vImageData, uiWidth, uiHeight, *m_pOptions);

@@ -78,6 +78,7 @@ namespace VTFEdit
 		vlBool GenerateThumbnail;
 		vlBool GenerateSphereMap;
 		vlBool StripAlpha;
+		vlBool Dilate;
 		vlBool sRGB;
 		vlBool NormalMap;
 

@@ -35,6 +35,9 @@ namespace VTFEdit
 		bool HasAlphaData(const vlByte *lpImageData, vlUInt uiWidth, vlUInt uiHeight);
 		bool HasAlphaDataRGBA32F(const vlSingle *lpImageData, vlUInt uiWidth, vlUInt uiHeight);
 
+		// Pads the colour of opaque pixels out into fully transparent ones
+		void ApplyDilation(std::vector<vlByte *> &vImageData, vlUInt uiWidth, vlUInt uiHeight, bool bFloat);
+
 		// Replaces the alpha channel of every RGBA8888 frame with a signed distance field
 		bool ApplyDistanceAlpha(std::vector<vlByte *> &vImageData, vlUInt &uiWidth, vlUInt &uiHeight, const VtfOptions &Options);
 

@@ -349,6 +349,7 @@ namespace VTFEdit
 			|| Current.LuminanceWeightB != Defaults.LuminanceWeightB
 			|| (Current.ComputeReflectivity != vlFalse) != (Defaults.ComputeReflectivity != vlFalse)
 			|| (Current.GenerateSphereMap != vlFalse) != (Defaults.GenerateSphereMap != vlFalse)
+			|| (Current.Dilate != vlFalse) != (Defaults.Dilate != vlFalse)
 			|| (Current.DistanceAlpha != vlFalse) != (Defaults.DistanceAlpha != vlFalse)
 			|| Current.DistanceAlphaSpread != Defaults.DistanceAlphaSpread
 			|| Current.DistanceAlphaReduce != Defaults.DistanceAlphaReduce
@@ -645,7 +646,10 @@ namespace VTFEdit
 		m_pReflectivity = new QCheckBox(tr("Compute reflectivity"), pMisc);
 		m_pSphereMap = new QCheckBox(tr("Generate sphere map"), pMisc);
 		pMiscLayout->addWidget(m_pReflectivity);
-		pMiscLayout->addWidget(m_pSphereMap);
+		pMiscLayout->addWidget(m_pSphereMap); 
+		m_pDilate = new QCheckBox(tr("Dilate"), pMisc);
+		m_pDilate->setToolTip(tr("Pads the colour of visible pixels out into fully transparent areas"));
+		pMiscLayout->addWidget(m_pDilate);
 
 		QGroupBox *pDistanceAlpha = new QGroupBox(tr("Distance Alpha:"), pTab);
 		QFormLayout *pDistanceAlphaForm = new QFormLayout(pDistanceAlpha);
@@ -799,6 +803,7 @@ namespace VTFEdit
 
 		const bool bAlphaFormat = !m_pStripAlpha->isChecked();
 		m_pAlphaFormat->setEnabled(bAlphaFormat);
+		m_pDilate->setEnabled(bAlphaFormat);
 		if(m_pAlphaFormatLabel != nullptr)
 			m_pAlphaFormatLabel->setEnabled(bAlphaFormat);
 
@@ -901,6 +906,7 @@ namespace VTFEdit
 		m_pReflectivity->setChecked(Options.ComputeReflectivity != vlFalse);
 		m_pThumbnail->setChecked(Options.GenerateThumbnail != vlFalse);
 		m_pSphereMap->setChecked(Options.GenerateSphereMap != vlFalse);
+		m_pDilate->setChecked(Options.Dilate != vlFalse);
 		m_pStripAlpha->setChecked(Options.StripAlpha != vlFalse);
 		m_pSrgb->setChecked(Options.sRGB != vlFalse);
 		m_pNormalMap->setChecked(Options.NormalMap != vlFalse);
@@ -980,6 +986,7 @@ namespace VTFEdit
 		Options.ComputeReflectivity = m_pReflectivity->isChecked() ? vlTrue : vlFalse;
 		Options.GenerateThumbnail = m_pThumbnail->isChecked() ? vlTrue : vlFalse;
 		Options.GenerateSphereMap = m_pSphereMap->isChecked() ? vlTrue : vlFalse;
+		Options.Dilate = m_pDilate->isChecked() ? vlTrue : vlFalse;
 		Options.StripAlpha = m_pStripAlpha->isChecked() ? vlTrue : vlFalse;
 		Options.sRGB = m_pSrgb->isChecked() ? vlTrue : vlFalse;
 		Options.NormalMap = m_pNormalMap->isChecked() ? vlTrue : vlFalse;
