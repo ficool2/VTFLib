@@ -31,6 +31,7 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QSpinBox;
+class QToolButton;
 
 namespace VTFEdit
 {
@@ -51,6 +52,7 @@ namespace VTFEdit
 		void onPresetRestoreClicked();
 		void onSettingChanged();
 		void updateEnabledState();
+		void updateSectionMarkers();
 
 	private:
 		QWidget *createPresetBar();
@@ -76,6 +78,9 @@ namespace VTFEdit
 		QPushButton *m_pPresetSave;
 		QPushButton *m_pPresetDelete;
 		QPushButton *m_pPresetRestore;
+
+		QToolButton *m_pAdvancedHeader;
+		QToolButton *m_pResourcesHeader;
 
 		QComboBox *m_pFormat;
 		QComboBox *m_pAlphaFormat;

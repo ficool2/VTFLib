@@ -96,6 +96,7 @@ namespace VTFEdit
 		VtfOptions normalMapBase()
 		{
 			VtfOptions Options = diffuseBase();
+			Options.GenerateThumbnail = vlFalse;
 			Options.sRGB = vlFalse;
 			Options.NormalMap = vlTrue;
 			return Options;
@@ -146,6 +147,7 @@ namespace VTFEdit
 
 			{
 				VtfOptions Options = diffuseBase();
+				Options.GenerateThumbnail = vlFalse;
 				Options.Version = QStringLiteral("7.6");
 				Options.AlphaFormat = IMAGE_FORMAT_BC7;
 				add(QStringLiteral("Compressed Diffuse Texture (DX11)"),
@@ -165,6 +167,7 @@ namespace VTFEdit
 
 			{
 				VtfOptions Options;
+				Options.GenerateThumbnail = vlFalse;
 				Options.NormalFormat = IMAGE_FORMAT_BGR888;
 				Options.AlphaFormat = IMAGE_FORMAT_BGRA8888;
 				Options.GenerateMipmaps = vlFalse;
@@ -179,6 +182,7 @@ namespace VTFEdit
 
 			{
 				VtfOptions Options = diffuseBase();
+				Options.GenerateThumbnail = vlFalse;
 				Options.AlphaFormat = IMAGE_FORMAT_DXT5;
 				Options.FlagClampS = vlTrue;
 				Options.FlagClampT = vlTrue;
@@ -189,6 +193,7 @@ namespace VTFEdit
 
 			{
 				VtfOptions Options;
+				Options.GenerateThumbnail = vlFalse;
 				Options.NormalFormat = IMAGE_FORMAT_BGR888;
 				Options.AlphaFormat = IMAGE_FORMAT_BGRA8888;
 				Options.GenerateMipmaps = vlFalse;
@@ -203,6 +208,7 @@ namespace VTFEdit
 
 			{
 				VtfOptions Options = diffuseBase();
+				Options.GenerateThumbnail = vlFalse;
 				Options.TextureType = VtfTextureType::EnvironmentMap;
 				Options.GenerateSphereMap = vlTrue;
 				add(QStringLiteral("Environment Map (Cubemap)"),
@@ -212,6 +218,7 @@ namespace VTFEdit
 
 			{
 				VtfOptions Options;
+				Options.GenerateThumbnail = vlFalse;
 				Options.NormalFormat = IMAGE_FORMAT_RGBA16161616F;
 				Options.AlphaFormat = IMAGE_FORMAT_RGBA16161616F;
 				Options.TextureType = VtfTextureType::EnvironmentMap;
@@ -224,6 +231,7 @@ namespace VTFEdit
 
 			{
 				VtfOptions Options;
+				Options.GenerateThumbnail = vlFalse;
 				Options.NormalFormat = IMAGE_FORMAT_I8;
 				Options.AlphaFormat = IMAGE_FORMAT_RGBA8888;
 				Options.sRGB = vlFalse;
@@ -234,6 +242,7 @@ namespace VTFEdit
 
 			{
 				VtfOptions Options;
+				Options.GenerateThumbnail = vlFalse;
 				Options.NormalFormat = IMAGE_FORMAT_I8;
 				Options.AlphaFormat = IMAGE_FORMAT_RGBA8888;
 				Options.GenerateMipmaps = vlFalse;

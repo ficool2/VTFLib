@@ -36,7 +36,7 @@
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QStandardItemModel>
-#include <QTabWidget>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 namespace VTFEdit
@@ -113,6 +113,37 @@ namespace VTFEdit
 			}
 		}
 
+		QWidget *createCollapsible(const QString &sTitle, QWidget *pContent, QWidget *pParent, QToolButton **ppHeader)
+		{
+			QWidget *pSection = new QWidget(pParent);
+			QVBoxLayout *pLayout = new QVBoxLayout(pSection);
+			pLayout->setContentsMargins(0, 0, 0, 0);
+
+			QToolButton *pHeader = new QToolButton(pSection);
+			pHeader->setText(sTitle);
+			pHeader->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+			pHeader->setArrowType(Qt::RightArrow);
+			pHeader->setAutoRaise(true);
+			pHeader->setCheckable(true);
+			pHeader->setChecked(false);
+
+			pContent->setParent(pSection);
+			pContent->setVisible(false);
+
+			pLayout->addWidget(pHeader);
+			pLayout->addWidget(pContent);
+
+			QObject::connect(pHeader, &QToolButton::toggled, pSection, [pHeader, pContent](bool bExpanded)
+			{
+				pHeader->setArrowType(bExpanded ? Qt::DownArrow : Qt::RightArrow);
+				pContent->setVisible(bExpanded);
+			});
+
+			*ppHeader = pHeader;
+
+			return pSection;
+		}
+
 		template <int N>
 		void fill(QComboBox *pCombo, const char *const (&names)[N])
 		{
@@ -165,10 +196,12 @@ namespace VTFEdit
 
 		QWidget *pPresetBar = createPresetBar();
 
-		QTabWidget *pTabs = new QTabWidget(this);
-		pTabs->addTab(createGeneralTab(), tr("General"));
-		pTabs->addTab(createAdvancedTab(), tr("Advanced"));
-		pTabs->addTab(createResourcesTab(), tr("Resources"));
+		QWidget *pTabs = new QWidget(this);
+		QVBoxLayout *pTabsLayout = new QVBoxLayout(pTabs);
+		pTabsLayout->setContentsMargins(0, 0, 0, 0);
+		pTabsLayout->addWidget(createGeneralTab());
+		pTabsLayout->addWidget(createCollapsible(tr("Advanced"), createAdvancedTab(), pTabs, &m_pAdvancedHeader));
+		pTabsLayout->addWidget(createCollapsible(tr("Resources"), createResourcesTab(), pTabs, &m_pResourcesHeader));
 
 		QDialogButtonBox *pButtons = new QDialogButtonBox(
 			QDialogButtonBox::Ok | QDialogButtonBox::Cancel | QDialogButtonBox::Reset, this);
@@ -178,6 +211,8 @@ namespace VTFEdit
 			this, &VtfOptionsDialog::onResetClicked);
 
 		QVBoxLayout *pLayout = new QVBoxLayout(this);
+		// grow and shrink with the collapsible sections
+		pLayout->setSizeConstraint(QLayout::SetFixedSize);
 		pLayout->addWidget(pPresetBar);
 		pLayout->addWidget(pTabs);
 		pLayout->addWidget(pButtons);
@@ -210,6 +245,10 @@ namespace VTFEdit
 		for(QDoubleSpinBox *pSpinBox : pTabs->findChildren<QDoubleSpinBox *>())
 		{
 			connect(pSpinBox, &QDoubleSpinBox::valueChanged, this, &VtfOptionsDialog::onSettingChanged);
+		}
+		for(QLineEdit *pLineEdit : pTabs->findChildren<QLineEdit *>())
+		{
+			connect(pLineEdit, &QLineEdit::textChanged, this, &VtfOptionsDialog::updateSectionMarkers);
 		}
 	}
 
@@ -292,6 +331,45 @@ namespace VTFEdit
 		m_pPreset->setCurrentIndex(iIndex >= 0 ? iIndex : 0);
 
 		updatePresetButtons(iPreset);
+		updateSectionMarkers();
+	}
+
+	void VtfOptionsDialog::updateSectionMarkers()
+	{
+		VtfOptions Current;
+		controlsToOptions(Current);
+
+		const VtfOptions Defaults;
+
+		const bool bAdvancedModified =
+			(Current.CorrectGamma != vlFalse) != (Defaults.CorrectGamma != vlFalse)
+			|| Current.GammaCorrection != Defaults.GammaCorrection
+			|| Current.LuminanceWeightR != Defaults.LuminanceWeightR
+			|| Current.LuminanceWeightG != Defaults.LuminanceWeightG
+			|| Current.LuminanceWeightB != Defaults.LuminanceWeightB
+			|| (Current.ComputeReflectivity != vlFalse) != (Defaults.ComputeReflectivity != vlFalse)
+			|| (Current.GenerateSphereMap != vlFalse) != (Defaults.GenerateSphereMap != vlFalse)
+			|| (Current.DistanceAlpha != vlFalse) != (Defaults.DistanceAlpha != vlFalse)
+			|| Current.DistanceAlphaSpread != Defaults.DistanceAlphaSpread
+			|| Current.DistanceAlphaReduce != Defaults.DistanceAlphaReduce
+			|| Current.DistanceAlphaThreshold != Defaults.DistanceAlphaThreshold;
+
+		const bool bResourcesModified =
+			(Current.CreateLODControlResource != vlFalse) != (Defaults.CreateLODControlResource != vlFalse)
+			|| Current.LODControlClampU != Defaults.LODControlClampU
+			|| Current.LODControlClampV != Defaults.LODControlClampV
+			|| Current.AuxCompressionLevel != Defaults.AuxCompressionLevel
+			|| Current.AuxCompressionMethod != Defaults.AuxCompressionMethod
+			|| (Current.CreateInformationResource != vlFalse) != (Defaults.CreateInformationResource != vlFalse)
+			|| Current.InformationAuthor != Defaults.InformationAuthor
+			|| Current.InformationContact != Defaults.InformationContact
+			|| Current.InformationVersion != Defaults.InformationVersion
+			|| Current.InformationModification != Defaults.InformationModification
+			|| Current.InformationDescription != Defaults.InformationDescription
+			|| Current.InformationComments != Defaults.InformationComments;
+
+		m_pAdvancedHeader->setText(bAdvancedModified ? tr("Advanced *") : tr("Advanced"));
+		m_pResourcesHeader->setText(bResourcesModified ? tr("Resources *") : tr("Resources"));
 	}
 
 	void VtfOptionsDialog::onSettingChanged()
@@ -326,6 +404,7 @@ namespace VTFEdit
 		m_bApplyingPreset = false;
 
 		updateEnabledState();
+		updateSectionMarkers();
 	}
 
 	void VtfOptionsDialog::onPresetSaveClicked()
@@ -421,6 +500,7 @@ namespace VTFEdit
 	{
 		QWidget *pTab = new QWidget(this);
 		QHBoxLayout *pLayout = new QHBoxLayout(pTab);
+		pLayout->setContentsMargins(0, 0, 0, 0);
 		QVBoxLayout *pLeft = new QVBoxLayout();
 		QVBoxLayout *pRight = new QVBoxLayout();
 		pLayout->addLayout(pLeft);
@@ -469,19 +549,30 @@ namespace VTFEdit
 		m_pStripAlpha = new QCheckBox(tr("Strip alpha channel"), pGeneral);
 		m_pStripAlpha->setToolTip(tr("Discard the alpha channel of imported images.\n"
 			"The colour format is always used when this is enabled."));
-		pGeneralForm->addRow(m_pStripAlpha);
 
 		m_pSrgb = new QCheckBox(tr("sRGB"), pGeneral);
 		m_pSrgb->setToolTip(tr("Marks the texture as storing standard image colours.\n"
 			"This affects how mipmaps and resizing filters are computed.\n"
 			"Leave this off for textures that store data rather than color,\n"
 			"such as normal maps, masks, exponent maps and UI icons."));
-		pGeneralForm->addRow(m_pSrgb);
 
 		m_pNormalMap = new QCheckBox(tr("Normal map"), pGeneral);
 		m_pNormalMap->setToolTip(tr("Marks the texture as storing tangent space normals.\n"
 			"Normals are re-normalized after resizing and when generating mipmaps."));
-		pGeneralForm->addRow(m_pNormalMap);
+
+		m_pThumbnail = new QCheckBox(tr("Generate thumbnail"), pGeneral);
+		m_pThumbnail->setToolTip(tr("Stores a tiny low resolution copy of the texture."));
+
+		QWidget *pOptions = new QWidget(pGeneral);
+		QGridLayout *pOptionsGrid = new QGridLayout(pOptions);
+		pOptionsGrid->setContentsMargins(0, 0, 0, 0);
+		pOptionsGrid->addWidget(m_pStripAlpha, 0, 0);
+		pOptionsGrid->addWidget( m_pThumbnail, 1, 0);
+		pOptionsGrid->addWidget(m_pSrgb, 0, 1);
+		pOptionsGrid->addWidget(m_pNormalMap, 1, 1);
+		pOptionsGrid->setColumnStretch(0, 1);
+		pOptionsGrid->setColumnStretch(1, 1);
+		pGeneralForm->addRow(pOptions);
 
 		pGeneralForm->addRow(new QLabel(tr("Flags:"), pGeneral));
 		pGeneralForm->addRow(pFlags);
@@ -533,6 +624,7 @@ namespace VTFEdit
 	{
 		QWidget *pTab = new QWidget(this);
 		QHBoxLayout *pLayout = new QHBoxLayout(pTab);
+		pLayout->setContentsMargins(0, 0, 0, 0);
 		QVBoxLayout *pLeft = new QVBoxLayout();
 		QVBoxLayout *pRight = new QVBoxLayout();
 		pLayout->addLayout(pLeft);
@@ -551,10 +643,8 @@ namespace VTFEdit
 		QGroupBox *pMisc = new QGroupBox(tr("Miscellaneous:"), pTab);
 		QVBoxLayout *pMiscLayout = new QVBoxLayout(pMisc);
 		m_pReflectivity = new QCheckBox(tr("Compute reflectivity"), pMisc);
-		m_pThumbnail = new QCheckBox(tr("Generate thumbnail"), pMisc);
 		m_pSphereMap = new QCheckBox(tr("Generate sphere map"), pMisc);
 		pMiscLayout->addWidget(m_pReflectivity);
-		pMiscLayout->addWidget(m_pThumbnail);
 		pMiscLayout->addWidget(m_pSphereMap);
 
 		QGroupBox *pDistanceAlpha = new QGroupBox(tr("Distance Alpha:"), pTab);
@@ -611,6 +701,7 @@ namespace VTFEdit
 	{
 		QWidget *pTab = new QWidget(this);
 		QHBoxLayout *pLayout = new QHBoxLayout(pTab);
+		pLayout->setContentsMargins(0, 0, 0, 0);
 		QVBoxLayout *pLeft = new QVBoxLayout();
 		QVBoxLayout *pRight = new QVBoxLayout();
 		pLayout->addLayout(pLeft);
