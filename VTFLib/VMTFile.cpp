@@ -380,7 +380,7 @@ public:
 		{
 			this->GetNextTokenInternal();
 		}
-		catch(char *cErrorMessage)
+		catch(const char *cErrorMessage)
 		{
 			// The bad token is the one we were reading ahead for
 			// so blame it line rather than the line of the last token handed to the parser
@@ -625,7 +625,7 @@ public:
 						NextGroup = new CVMTGroupNode("");
 						this->Parse(NextGroup);
 					}
-					catch(char *cErrorMessage)
+					catch(const char *cErrorMessage)
 					{
 						delete NextGroup;
 						throw cErrorMessage;
@@ -831,7 +831,7 @@ vlBool CVMTFile::Load(IO::Readers::IReader *Reader)
 		Tokenizer.Prime();
 		this->Root = Parser.Parse();
 	}
-	catch(char *cErrorMessage)
+	catch(const char *cErrorMessage)
 	{
 		vlUInt uiLine = Parser.GetErrorLine();
 		if(uiLine == 0)
