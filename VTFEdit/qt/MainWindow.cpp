@@ -30,6 +30,7 @@
 #include "VmtFileUtility.h"
 #include "VtfFileUtility.h"
 #include "VtfOptionsDialog.h"
+#include "StyleOptions.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -594,6 +595,10 @@ namespace VTFEdit
 		m_pAutoCreateVmtFileAction = new QAction(tr("&Auto Create VMT File"), this);
 		m_pAutoCreateVmtFileAction->setCheckable(true);
 
+        m_pStyleOptions = new StyleOptions(this);
+        m_pStyleOptionsAction = new QAction(tr("&Style/Theme Options..."), this);
+        connect(m_pStyleOptionsAction, &QAction::triggered, m_pStyleOptions, &StyleOptions::exec);
+
 		m_pCubemapCrossAction = new QAction(tr("Unwrap &Cubemaps"), this);
 		m_pCubemapCrossAction->setCheckable(true);
 		m_pCubemapCrossAction->setChecked(true);
@@ -674,6 +679,8 @@ namespace VTFEdit
 		pOptionsMenu->addAction(m_pCubemapCrossAction);
 		pOptionsMenu->addSeparator();
 		pOptionsMenu->addAction(m_pVmtEditorOptionsAction);
+        pOptionsMenu->addSeparator();
+        pOptionsMenu->addAction(m_pStyleOptionsAction);
 
 		QMenu *pHelpMenu = menuBar()->addMenu(tr("&Help"));
 		pHelpMenu->addAction(m_pAboutAction);
@@ -4011,6 +4018,12 @@ namespace VTFEdit
 					m_VmtEditorSettings.eTheme = VmtEditorTheme::System;
 			}
 
+            else if(sArg.compare(QLatin1String("StyleOptions.Style"), Qt::CaseInsensitive) == 0)
+                this->m_pStyleOptions->setStyle(sVal);
+
+            else if(sArg.compare(QLatin1String("StyleOptions.Theme"), Qt::CaseInsensitive) == 0)
+                this->m_pStyleOptions->setTheme(sVal.toInt());
+
 			else if(sArg.compare(QLatin1String("Forms.VTFEdit.Location.X"), Qt::CaseInsensitive) == 0)
 				Location.setX(sVal.toInt());
 			else if(sArg.compare(QLatin1String("Forms.VTFEdit.Location.Y"), Qt::CaseInsensitive) == 0)
@@ -4205,6 +4218,9 @@ namespace VTFEdit
 		Stream << "VmtEditor.Theme = " << (m_VmtEditorSettings.eTheme == VmtEditorTheme::Light
 			? QStringLiteral("Light") : m_VmtEditorSettings.eTheme == VmtEditorTheme::Dark
 			? QStringLiteral("Dark") : QStringLiteral("System")) << "\n";
+
+        Stream << "StyleOptions.Style = "  << this->m_pStyleOptions->getStyle() << "\n";
+        Stream << "StyleOptions.Theme = "  << QString::number(static_cast<int>(this->m_pStyleOptions->getTheme())) << "\n";
 
 		const QPoint FrameOffset = geometry().topLeft() - frameGeometry().topLeft();
 		const QRect NormalGeometry = normalGeometry();
