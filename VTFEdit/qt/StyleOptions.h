@@ -21,7 +21,7 @@ namespace VTFEdit {
         QPalette m_systemPalette;
         QString m_systemStyle;
 
-        QPalette m_CurrentTheme;
+        int m_CurrentTheme;
         QString m_CurrentStyle;
 
         QComboBox *m_pStyleOption;

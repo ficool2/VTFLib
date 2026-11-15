@@ -147,7 +147,7 @@ void VTFEdit::StyleOptions::updateThemeAndStyle()
 
 int VTFEdit::StyleOptions::exec()
 {
-    this->m_CurrentTheme = this->getTheme( this->m_pThemeOption->currentData().value<VTFEditTheme>() );;
+    this->m_CurrentTheme = this->m_pThemeOption->currentData().toInt();;
     this->m_CurrentStyle = this->m_pStyleOption->currentData().toString();
 
     int res = QDialog::exec();
@@ -155,8 +155,9 @@ int VTFEdit::StyleOptions::exec()
     if(res == QDialog::Accepted)
         return res;
 
-    QApplication::setStyle( this->m_CurrentStyle );
-    QApplication::setPalette( this->m_CurrentTheme );
+    this->setTheme(this->m_CurrentTheme);
+    this->setStyle(this->m_CurrentStyle);
+
     return res;
 }
 
