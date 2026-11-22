@@ -5029,7 +5029,7 @@ vlBool CVTFFile::Resize(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt
 	if (!stbir_resize_uint8_generic(
 		lpSourceRGBA8888, uiSourceWidth, uiSourceHeight, 0,
 		lpDestRGBA8888, uiDestWidth, uiDestHeight, 0,
-		4, 3, 0, STBIR_EDGE_CLAMP, GetSTBFilter(ResizeFilter), bSRGB ? STBIR_COLORSPACE_SRGB : STBIR_COLORSPACE_LINEAR, NULL))
+		4, 3, STBIR_FLAG_ALPHA_PREMULTIPLIED, STBIR_EDGE_CLAMP, GetSTBFilter(ResizeFilter), bSRGB ? STBIR_COLORSPACE_SRGB : STBIR_COLORSPACE_LINEAR, NULL))
 	{
 		LastError.Set("Error resizing image.");
 		return vlFalse;
@@ -5109,7 +5109,7 @@ vlBool CVTFFile::ResizeRGBA32F(vlSingle *lpSource, vlSingle *lpDest, vlUInt uiSo
 	if(!stbir_resize_float_generic(
 		lpSource, (int)uiSourceWidth, (int)uiSourceHeight, 0,
 		lpDest, (int)uiDestWidth, (int)uiDestHeight, 0,
-		4, 3, 0, STBIR_EDGE_CLAMP, GetSTBFilter(ResizeFilter), STBIR_COLORSPACE_LINEAR, NULL))
+		4, 3, STBIR_FLAG_ALPHA_PREMULTIPLIED, STBIR_EDGE_CLAMP, GetSTBFilter(ResizeFilter), STBIR_COLORSPACE_LINEAR, NULL))
 	{
 		LastError.Set("Error resizing image.");
 		return vlFalse;
