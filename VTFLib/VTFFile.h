@@ -855,6 +855,18 @@ namespace VTFLib
 		*/
 		static vlBool ConvertToDistanceField(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, vlSingle sSpread, vlByte bThreshold, vlBool *pbClipped);
 
+		//! Pads the colour of visible pixels out into fully transparent ones.
+		/*!
+
+			\param lpImageDataRGBA8888 is the image data to dilate in place.
+			\param uiWidth is the width of the image in pixels.
+			\param uiHeight is the height of the image in pixels.
+		*/
+		static vlVoid Dilate(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight);
+
+		//! RGBA32323232F version of Dilate().
+		static vlVoid DilateRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight);
+
 	private:
 		
 		// DXTn format decompression function

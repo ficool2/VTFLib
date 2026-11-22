@@ -725,6 +725,16 @@ VTFLIB_API vlBool vlImageConvertToDistanceField(vlByte *lpSourceRGBA8888, vlByte
 	return CVTFFile::ConvertToDistanceField(lpSourceRGBA8888, lpDestRGBA8888, uiSourceWidth, uiSourceHeight, uiDestWidth, uiDestHeight, sSpread, bThreshold, pbClipped);
 }
 
+VTFLIB_API vlVoid vlImageDilate(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight)
+{
+	CVTFFile::Dilate(lpImageDataRGBA8888, uiWidth, uiHeight);
+}
+
+VTFLIB_API vlVoid vlImageDilateRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight)
+{
+	CVTFFile::DilateRGBA32F(lpImageDataRGBA32F, uiWidth, uiHeight);
+}
+
 VTFLIB_API vlVoid vlImageCorrectImageGamma(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight, vlSingle sGammaCorrection)
 {
 	CVTFFile::CorrectImageGamma(lpImageDataRGBA8888, uiWidth, uiHeight, sGammaCorrection);

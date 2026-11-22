@@ -163,6 +163,9 @@ VTFLIB_API vlBool vlImageResizeRGBA32F(vlSingle *lpSourceRGBA32F, vlSingle *lpDe
 
 VTFLIB_API vlBool vlImageConvertToDistanceField(vlByte *lpSourceRGBA8888, vlByte *lpDestRGBA8888, vlUInt uiSourceWidth, vlUInt uiSourceHeight, vlUInt uiDestWidth, vlUInt uiDestHeight, vlSingle sSpread, vlByte bThreshold, vlBool *pbClipped);
 
+VTFLIB_API vlVoid vlImageDilate(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight);
+VTFLIB_API vlVoid vlImageDilateRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight);
+
 VTFLIB_API vlVoid vlImageCorrectImageGamma(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight, vlSingle sGammaCorrection);
 VTFLIB_API vlVoid vlImageCorrectImageGammaRGBA32F(vlSingle *lpImageDataRGBA32F, vlUInt uiWidth, vlUInt uiHeight, vlSingle sGammaCorrection);
 VTFLIB_API vlVoid vlImageComputeImageReflectivity(vlByte *lpImageDataRGBA8888, vlUInt uiWidth, vlUInt uiHeight, vlSingle *sX, vlSingle *sY, vlSingle *sZ);
