@@ -79,6 +79,8 @@ Correct vtfcmd usage:
  -dspread <single>        (Width of the distance field gradient in output pixels.)
  -dreduce <integer>       (Shrink the image by this factor after computing the field.)
  -dthreshold <integer>    (Source alpha above which a pixel is inside the shape.)
+ -dilate                  (Bleed edge colours into fully transparent pixels.)
+ -pad <integer>           (Add this many transparent pixels around each edge.)
  -animate                 (Combine all input images into one animated texture.)
  -nomipmaps               (Don't generate mipmaps.)
  -mfilter <string>        (Mipmap filter to use.)
@@ -100,7 +102,7 @@ vtfcmd.exe -file "C:\texture1.bmp" -file "C:\texture2.bmp" -format "dxt1"
 vtfcmd.exe -folder "C:\input\*.tga" -output "C:\output" -recurse -pause
 vtfcmd.exe -folder "C:\output\*.vtf" -output "C:\input" -exportformat "jpg"
 vtfcmd.exe -folder "C:\textures\*.vtf" -stripmips
-vtfcmd.exe -folder "C:\frames\*.png" -animate -format bc7 -alphaformat bc7 -version 7.6 -nomipmaps
+vtfcmd.exe -folder "C:\frames\*.png" -animate -dilate -format bc7 -alphaformat bc7 -version 7.6 -nomipmaps
 ```
 
 ## Program Copyright-Permissions

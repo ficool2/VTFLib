@@ -59,6 +59,8 @@ vlSingle sDistanceAlphaSpread = 1.0f;				// Width of the distance field gradient
 vlUInt uiDistanceAlphaReduce = 1;					// Amount to shrink the image by after computing the field.
 vlByte bDistanceAlphaThreshold = 10;				// Source alpha above which a pixel is inside the shape.
 vlUInt uiKeepMipmaps = 0;							// Mipmap levels to keep when stripping .vtf files
+vlBool bDilate = vlFalse;							// Bleed opaque colours into fully transparent pixels.
+vlUInt uiPad = 0;									// Transparent border to add around each image.
 vlBool bAnimate = vlFalse;							// Combine all input images into one animated texture.
 vlUInt uiFrameCount = 0;
 vlChar *lpFrames[MAX_ITEMS];						// Image files queued as animation frames.
@@ -539,6 +541,22 @@ int main(int argc, char* argv[])
 					return 2;
 				}
 			}
+			else if(stricmp(argv[i], "-dilate") == 0)
+			{
+				bDilate = vlTrue;
+			}
+			else if(stricmp(argv[i], "-pad") == 0)
+			{
+				if(i + 1 < argc && sscanf(argv[++i], "%u", &uiTemp0) == 1)
+				{
+					uiPad = uiTemp0;
+				}
+				else
+				{
+					PrintUsage("-pad expects an unsigned integer argument.");
+					return 2;
+				}
+			}
 			else if(stricmp(argv[i], "-animate") == 0)
 			{
 				bAnimate = vlTrue;
@@ -808,6 +826,8 @@ void PrintUsage(const vlChar *lpError, ...)
 	Print(" -dspread <single>        (Width of the distance field gradient in output pixels.)\n");
 	Print(" -dreduce <integer>       (Shrink the image by this factor after computing the field.)\n");
 	Print(" -dthreshold <integer>    (Source alpha above which a pixel is inside the shape.)\n");
+	Print(" -dilate                  (Bleed edge colours into fully transparent pixels.)\n");
+	Print(" -pad <integer>           (Add this many transparent pixels around each edge.)\n");
 	Print(" -animate                 (Combine all input images into one animated texture.)\n");
 	Print(" -nomipmaps               (Don't generate mipmaps.)\n");
 	Print(" -mfilter <string>        (Mipmap filter to use.)\n");
@@ -829,7 +849,7 @@ void PrintUsage(const vlChar *lpError, ...)
 	Print("vtfcmd.exe -folder \"C:\\input\\*.tga\" -output \"C:\\output\" -recurse -pause\n");
 	Print("vtfcmd.exe -folder \"C:\\output\\*.vtf\" -output \"C:\\input\" -exportformat \"jpg\"\n");
 	Print("vtfcmd.exe -folder \"C:\\textures\\*.vtf\" -stripmips\n");
-	Print("vtfcmd.exe -folder \"C:\\frames\\*.png\" -animate -format bc7 -alphaformat bc7 -version 7.6 -nomipmaps\n");
+	Print("vtfcmd.exe -folder \"C:\\frames\\*.png\" -animate -dilate -format bc7 -alphaformat bc7 -version 7.6 -nomipmaps\n");
 
 	if(lpError != 0 && !bSilent)
 	{
@@ -1014,6 +1034,43 @@ vlByte *LoadFrame(vlChar *lpInputFile, vlUInt *pWidth, vlUInt *pHeight, VTFImage
 		return 0;
 	}
 	memcpy(lpSourceData, ilGetData(), uiSize);
+
+	// Surround the image with a transparent border.
+	if(uiPad != 0)
+	{
+		vlUInt uiPixel = 4 * (bFloat ? (vlUInt)sizeof(vlSingle) : 1), y;
+		vlUInt uiPaddedWidth = uiImageWidth + uiPad * 2, uiPaddedHeight = uiImageHeight + uiPad * 2;
+		vlByte *lpPadded = (vlByte *)calloc((size_t)uiPaddedWidth * uiPaddedHeight, uiPixel);
+
+		if(lpPadded == 0)
+		{
+			Print("  Error allocating padded image.\n\n");
+			free(lpSourceData);
+			return 0;
+		}
+
+		for(y = 0; y < uiImageHeight; y++)
+		{
+			memcpy(lpPadded + ((size_t)(y + uiPad) * uiPaddedWidth + uiPad) * uiPixel,
+				lpSourceData + (size_t)y * uiImageWidth * uiPixel, (size_t)uiImageWidth * uiPixel);
+		}
+
+		free(lpSourceData);
+		lpSourceData = lpPadded;
+
+		uiImageWidth = uiPaddedWidth;
+		uiImageHeight = uiPaddedHeight;
+		// The border is transparent, so the texture needs alpha.
+		CreateOptions.ImageFormat = AlphaFormat;
+	}
+
+	if(bDilate)
+	{
+		if(bFloat)
+			vlImageDilateRGBA32F((vlSingle *)lpSourceData, uiImageWidth, uiImageHeight);
+		else
+			vlImageDilate(lpSourceData, uiImageWidth, uiImageHeight);
+	}
 
 	// Replace the alpha channel with a distance field.
 	if(bDistanceAlpha && !bFloat)
