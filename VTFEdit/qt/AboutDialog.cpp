@@ -49,7 +49,7 @@ namespace VTFEdit
 
 		QVBoxLayout *pAboutLayout = new QVBoxLayout();
 
-		QLabel *pVersion = new QLabel(tr("VTFEdit++ Version: 4.3.1"), pAbout);
+		QLabel *pVersion = new QLabel(tr("VTFEdit++ Version: 4.3.2"), pAbout);
 		////QLabel *pLibVersion = new QLabel(
 		//	tr("VTFLib Version: %1").arg(QString::fromLatin1(vlGetVersionString())), pAbout);
 		QLabel *pAuthor = new QLabel(
