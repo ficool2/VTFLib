@@ -63,6 +63,7 @@ namespace VTFEdit
 	class VmtEditorOptionsDialog;
 	class VmtHighlighter;
 	class VtfOptionsDialog;
+    class StyleOptions;
 
 	struct Document
 	{
@@ -313,6 +314,7 @@ namespace VTFEdit
 		VtfOptionsDialog *m_pOptionsDialog;
 		VmtCreateDialog *m_pVmtCreateDialog;
 		VmtEditorOptionsDialog *m_pVmtEditorOptionsDialog;
+        StyleOptions* m_pStyleOptions;
 		BatchConvertDialog *m_pBatchConvertDialog;
 		AboutDialog *m_pAboutDialog;
 
@@ -351,6 +353,7 @@ namespace VTFEdit
 		QAction *m_pCreateVmtFileAction;
 		QAction *m_pConvertFolderAction;
 		QAction *m_pAutoCreateVmtFileAction;
+        QAction *m_pStyleOptionsAction;
 		QAction *m_pSingleInstanceAction;
 		QAction *m_pCubemapCrossAction;
 		QAction *m_pVmtEditorOptionsAction;

@@ -43,6 +43,8 @@ qt_add_executable(vtfedit
 	qt/FileDialogHistory.h
 	qt/VTFLibQt.h
 	qt/VTFEdit.rc
+	qt/StyleOptions.cpp
+	qt/StyleOptions.h
 )
 
 qt_add_resources(vtfedit "vtfedit_resources"
