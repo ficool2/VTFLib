@@ -59,6 +59,9 @@ vlSingle sDistanceAlphaSpread = 1.0f;				// Width of the distance field gradient
 vlUInt uiDistanceAlphaReduce = 1;					// Amount to shrink the image by after computing the field.
 vlByte bDistanceAlphaThreshold = 10;				// Source alpha above which a pixel is inside the shape.
 vlUInt uiKeepMipmaps = 0;							// Mipmap levels to keep when stripping .vtf files
+vlBool bAnimate = vlFalse;							// Combine all input images into one animated texture.
+vlUInt uiFrameCount = 0;
+vlChar *lpFrames[MAX_ITEMS];						// Image files queued as animation frames.
 
 void Pause();
 void Print(const vlChar *lpFormat, ...);
@@ -66,6 +69,7 @@ void PrintUsage(const vlChar *lpError, ...);
 
 void ProcessFile(vlChar *lpInputFile);
 void ProcessFolder(vlChar *lpInputFolder, vlChar *lpWildcard);
+void ProcessAnimation();
 
 //
 // stristr()
@@ -535,6 +539,10 @@ int main(int argc, char* argv[])
 					return 2;
 				}
 			}
+			else if(stricmp(argv[i], "-animate") == 0)
+			{
+				bAnimate = vlTrue;
+			}
 			else if(stricmp(argv[i], "-nomipmaps") == 0)
 			{
 				CreateOptions.bMipmaps = vlFalse;
@@ -710,6 +718,11 @@ int main(int argc, char* argv[])
 		ProcessFolder(lpFolders[i], lpWildcard);
 	}
 
+	if(bAnimate)
+	{
+		ProcessAnimation();
+	}
+
 	// Shutdown DevIL.
 	ilDeleteImages(1, &uiDevILImage);
 
@@ -795,6 +808,7 @@ void PrintUsage(const vlChar *lpError, ...)
 	Print(" -dspread <single>        (Width of the distance field gradient in output pixels.)\n");
 	Print(" -dreduce <integer>       (Shrink the image by this factor after computing the field.)\n");
 	Print(" -dthreshold <integer>    (Source alpha above which a pixel is inside the shape.)\n");
+	Print(" -animate                 (Combine all input images into one animated texture.)\n");
 	Print(" -nomipmaps               (Don't generate mipmaps.)\n");
 	Print(" -mfilter <string>        (Mipmap filter to use.)\n");
 	Print(" -stripmips               (Strip all mipmaps, same as -keepmips 1.)\n");
@@ -815,6 +829,7 @@ void PrintUsage(const vlChar *lpError, ...)
 	Print("vtfcmd.exe -folder \"C:\\input\\*.tga\" -output \"C:\\output\" -recurse -pause\n");
 	Print("vtfcmd.exe -folder \"C:\\output\\*.vtf\" -output \"C:\\input\" -exportformat \"jpg\"\n");
 	Print("vtfcmd.exe -folder \"C:\\textures\\*.vtf\" -stripmips\n");
+	Print("vtfcmd.exe -folder \"C:\\frames\\*.png\" -animate -format bc7 -alphaformat bc7 -version 7.6 -nomipmaps\n");
 
 	if(lpError != 0 && !bSilent)
 	{
@@ -944,206 +959,341 @@ void FlipImage(vlByte *lpImageData, vlUInt uiWidth, vlUInt uiHeight, vlUInt uiCh
 	}
 }
 
+
+//
+// LoadFrame()
+// Load an image and prepare it as RGBA data
+//
+vlByte *LoadFrame(vlChar *lpInputFile, vlUInt *pWidth, vlUInt *pHeight, VTFImageFormat *pSourceFormat)
+{
+	vlUInt uiImageWidth, uiImageHeight, uiDestWidth, uiDestHeight;
+	vlByte *lpSourceData, *lpDistanceData;
+	vlBool bFloat, bClipped;
+	vlInt iType;
+	size_t uiSize;
+
+	if(!ilLoadImage(lpInputFile))
+	{
+		Print(" Error loading input file %s.\n\n", lpInputFile);
+		return 0;
+	}
+
+	Print(" Information:\n");
+	Print("  Width: %d\n", ilGetInteger(IL_IMAGE_WIDTH));
+	Print("  Height: %d\n", ilGetInteger(IL_IMAGE_HEIGHT));
+	Print("  BPP: %d\n\n", ilGetInteger(IL_IMAGE_BYTES_PER_PIXEL));
+
+	iType = ilGetInteger(IL_IMAGE_TYPE);
+	bFloat = iType == IL_FLOAT || iType == IL_DOUBLE || iType == IL_HALF;
+	*pSourceFormat = bFloat ? IMAGE_FORMAT_RGBA32323232F : IMAGE_FORMAT_RGBA8888;
+
+	if(bFloat)
+	{
+		iType = ilGetInteger(IL_IMAGE_FORMAT);
+		CreateOptions.ImageFormat = (iType == IL_RGBA || iType == IL_BGRA) ? AlphaFormat : NormalFormat;
+	}
+	else
+	{
+		CreateOptions.ImageFormat = ilGetInteger(IL_IMAGE_BYTES_PER_PIXEL) == 4 ? AlphaFormat : NormalFormat;
+	}
+
+	// Convert input file to RGBA.
+	if(!ilConvertImage(IL_RGBA, bFloat ? IL_FLOAT : IL_UNSIGNED_BYTE))
+	{
+		Print("  Error converting input file.\n\n");
+		return 0;
+	}
+
+	uiImageWidth = (vlUInt)ilGetInteger(IL_IMAGE_WIDTH);
+	uiImageHeight = (vlUInt)ilGetInteger(IL_IMAGE_HEIGHT);
+
+	uiSize = (size_t)uiImageWidth * uiImageHeight * 4 * (bFloat ? sizeof(vlSingle) : 1);
+	if((lpSourceData = (vlByte *)malloc(uiSize)) == 0)
+	{
+		Print("  Error allocating image data.\n\n");
+		return 0;
+	}
+	memcpy(lpSourceData, ilGetData(), uiSize);
+
+	// Replace the alpha channel with a distance field.
+	if(bDistanceAlpha && !bFloat)
+	{
+		uiDestWidth = uiImageWidth / uiDistanceAlphaReduce;
+		uiDestHeight = uiImageHeight / uiDistanceAlphaReduce;
+
+		if(uiDestWidth == 0)
+			uiDestWidth = 1;
+		if(uiDestHeight == 0)
+			uiDestHeight = 1;
+
+		if((lpDistanceData = (vlByte *)malloc(uiDestWidth * uiDestHeight * 4)) == 0)
+		{
+			Print("  Error allocating distance field.\n\n");
+			free(lpSourceData);
+			return 0;
+		}
+
+		bClipped = vlFalse;
+
+		if(!vlImageConvertToDistanceField(lpSourceData, lpDistanceData, uiImageWidth, uiImageHeight, uiDestWidth, uiDestHeight, sDistanceAlphaSpread, bDistanceAlphaThreshold, &bClipped))
+		{
+			Print("  Error creating distance field:\n%s\n\n", vlGetLastError());
+			free(lpDistanceData);
+			free(lpSourceData);
+			return 0;
+		}
+
+		if(bClipped)
+		{
+			Print("  Warning: the distance field reaches the edge of the image and has been clipped.\n");
+		}
+
+		free(lpSourceData);
+		lpSourceData = lpDistanceData;
+		uiImageWidth = uiDestWidth;
+		uiImageHeight = uiDestHeight;
+
+		// The distance field always needs an alpha channel.
+		CreateOptions.ImageFormat = AlphaFormat;
+	}
+
+	*pWidth = uiImageWidth;
+	*pHeight = uiImageHeight;
+	return lpSourceData;
+}
+
+//
+// SaveTexture()
+// Write the bound vtf to the output path for lpInputFile, plus a vmt if requested.
+//
+vlBool SaveTexture(vlChar *lpInputFile)
+{
+	vlUInt i;
+	vlChar *lpTemp;
+	vlChar lpVTFFile[512];			// Holds output .vtf file name.
+	vlChar lpVMTFile[512];			// Holds output .vmt file name.
+	vlChar lpVMTBaseTexture[512];	// Holds $basetexture .vmt param.
+	vlInt iTest;					// Holds .vmt integer test result.
+	vlSingle sTest;					// Holds .vmt float test result.
+	vlChar cTest[4096];				// Holds .vmt string test result.
+
+	CreateOutputPath(lpVTFFile, lpInputFile, "vtf");
+
+	Print("  Writing %s...\n", lpVTFFile);
+	if(!vlImageSave(lpVTFFile))
+	{
+		Print(" Error creating vtf file:\n%s\n\n", vlGetLastError());
+		return vlFalse;
+	}
+	Print("  %s written.\n\n", lpVTFFile);
+
+	// Do we build a material?
+	if(lpShader != 0)
+	{
+		Print(" Creating material:\n");
+
+		// We need to constuct a $basetexture string, to do this we need the path
+		// of the vtf file relative to the materials folder.  If we arn't in a
+		// materials folder we can't do this.
+		if((lpTemp = stristr(lpVTFFile, "materials" PATH_SEPARATOR_STRING)) == 0)
+		{
+			Print("  Error creating vmt: texture is not in a ..." PATH_SEPARATOR_STRING "materials" PATH_SEPARATOR_STRING " folder.\n\n");
+		}
+		else
+		{
+			strcpy(lpVMTFile, lpVTFFile);
+			strcpy(strrchr(lpVMTFile, '.'), ".vmt");
+
+			strcpy(lpVMTBaseTexture, lpTemp + strlen("materials" PATH_SEPARATOR_STRING));
+			*strrchr(lpVMTBaseTexture, '.') = '\0';
+			strrpl(lpVMTBaseTexture, PATH_SEPARATOR, '/');
+
+			vlMaterialCreate(lpShader); // Create the root node.
+			vlMaterialGetFirstNode(); // Go to the root node.
+			vlMaterialAddNodeString("$basetexture", lpVMTBaseTexture); // Add a string node to the root node.
+
+			// Add the custom parameters.
+			for(i = 0; i < uiParameterCount; i++)
+			{
+				// Figure out if the parameter is a string, single or integer.
+
+				if(sscanf(lpParameters[i][1], "%d%s", &iTest, cTest) == 1)
+				{
+					// We can interpet the string as an integer, assume it is one.
+					vlMaterialAddNodeInteger(lpParameters[i][0], iTest);
+				}
+				else if(sscanf(lpParameters[i][1], "%f%s", &sTest, cTest) == 1)
+				{
+					// We can interpet the string as an single, assume it is one.
+					vlMaterialAddNodeSingle(lpParameters[i][0], sTest);
+				}
+				else
+				{
+					// The string must be a string...
+					vlMaterialAddNodeString(lpParameters[i][0], lpParameters[i][1]);
+				}
+			}
+
+			// Write vmt file.
+			Print("  Writing %s...\n", lpVMTFile);
+			if(!vlMaterialSave(lpVMTFile))
+			{
+				Print("Error creating vmt file:\n%s\n\n", vlGetLastError());
+				return vlFalse;
+			}
+			Print("  %s written.\n\n", lpVMTFile);
+		}
+	}
+
+	return vlTrue;
+}
+
+static int CompareStrings(const void *pA, const void *pB)
+{
+	return strcmp(*(vlChar * const *)pA, *(vlChar * const *)pB);
+}
+
+//
+// ProcessAnimation()
+// Build one animated vtf from all queued frames, named after the first frame.
+//
+void ProcessAnimation()
+{
+	vlUInt i, uiWidth, uiHeight, uiFrameWidth, uiFrameHeight, uiLoaded = 0;
+	VTFImageFormat SourceFormat, FrameFormat, ImageFormat = NormalFormat;
+	vlByte **lpFrameData;
+
+	if(uiFrameCount == 0)
+	{
+		return;
+	}
+
+	uiProcessed++;
+
+	qsort(lpFrames, uiFrameCount, sizeof(vlChar *), CompareStrings);
+
+	Print("Creating animated texture from %u frames...\n", uiFrameCount);
+
+	if((lpFrameData = (vlByte **)calloc(uiFrameCount, sizeof(vlByte *))) == 0)
+	{
+		Print(" malloc() failed.\n\n");
+		goto cleanup;
+	}
+
+	for(i = 0; i < uiFrameCount; i++)
+	{
+		Print(" Frame %u: %s\n", i, lpFrames[i]);
+
+		if((lpFrameData[i] = LoadFrame(lpFrames[i], &uiFrameWidth, &uiFrameHeight, &FrameFormat)) == 0)
+		{
+			goto cleanup;
+		}
+		uiLoaded = i + 1;
+
+		// Any frame with alpha makes the whole texture use the alpha format.
+		if(CreateOptions.ImageFormat == AlphaFormat)
+		{
+			ImageFormat = AlphaFormat;
+		}
+
+		if(i == 0)
+		{
+			uiWidth = uiFrameWidth;
+			uiHeight = uiFrameHeight;
+			SourceFormat = FrameFormat;
+		}
+		else if(uiFrameWidth != uiWidth || uiFrameHeight != uiHeight || FrameFormat != SourceFormat)
+		{
+			Print("  Error: frame is %ux%u but the first frame is %ux%u (all frames must match in size and type).\n\n", uiFrameWidth, uiFrameHeight, uiWidth, uiHeight);
+			goto cleanup;
+		}
+	}
+
+	Print(" Creating texture:\n");
+
+	CreateOptions.ImageFormat = ImageFormat;
+	if(!vlImageCreateMultipleEx(uiWidth, uiHeight, uiFrameCount, 1, 1, lpFrameData, &CreateOptions, SourceFormat))
+	{
+		Print("  Error creating vtf file:\n%s\n\n", vlGetLastError());
+		goto cleanup;
+	}
+
+	if(SaveTexture(lpFrames[0]))
+	{
+		Print("Animated texture processed.\n\n");
+		uiCompleted++;
+	}
+
+cleanup:
+	for(i = 0; i < uiLoaded; i++)
+		free(lpFrameData[i]);
+	free(lpFrameData);
+	for(i = 0; i < uiFrameCount; i++)
+		free(lpFrames[i]);
+	uiFrameCount = 0;
+}
+
 //
 // ProcessFile()
 // Convert input file to a vtf file and place it in the output folder.
 //
 void ProcessFile(vlChar *lpInputFile)
 {
-	vlUInt i;
-
 	vlChar *lpTemp;					// Temp variable for string manipulation.
 	vlChar lpVTFFile[512];			// Holds output .vtf file name.
-	vlChar lpVMTFile[512];			// Holds output .vmt file name.
-	vlChar lpVMTBaseTexture[512];	// Holds $basetexture .vmt param.
 	vlChar lpExportFile[512];		// Holds output export file name.
-
-	vlInt iTest;					// Holds .vmt integer test result.
-	vlSingle sTest;					// Holds .vmt float test result.
-	vlChar cTest[4096];				// Holds .vmt string test result.
 
 	vlUInt uiImageWidth, uiImageHeight;	// Dimensions of the image being created.
 	vlByte *lpSourceData;				// Image data to create the texture from.
-	vlByte *lpDistanceData;				// Distance field data.
-	vlUInt uiDestWidth, uiDestHeight;	// Distance field dimensions.
-	vlBool bClipped;					// Was the distance field clipped?
 
 	vlSingle sR, sG, sB;			// Reflectivity.
 	vlByte *lpImageData;			// Export data.
 	VTFImageFormat DestFormat;		// Export format.
 	VTFImageFormat SourceFormat;	// Format of the loaded image data.
 	vlBool bFloat;					// Is the image data 32 bit floating point?
-	vlInt iType;					// DevIL data type of the input file.
 	vlUInt uiChannels;				// Bytes per pixel of the export data.
+
+	lpTemp = strrchr(lpInputFile, '.');
+
+	if(bAnimate && (lpTemp == 0 || stricmp(lpTemp, ".vtf") != 0))
+	{
+		// Queue the frame; the texture is built once all inputs are known.
+		if(uiFrameCount < MAX_ITEMS)
+		{
+			lpFrames[uiFrameCount++] = strdup(lpInputFile);
+		}
+		else
+		{
+			Print("Too many animation frames, skipping %s.\n", lpInputFile);
+		}
+		return;
+	}
 
 	uiProcessed++;
 
 	Print("Processing %s...\n", lpInputFile);
 
-	lpTemp = strrchr(lpInputFile, '.');
-	
 	if(lpTemp == 0 || stricmp(lpTemp, ".vtf") != 0)
 	{
-		// Load input file.
-		if(!ilLoadImage(lpInputFile))
+		if((lpSourceData = LoadFrame(lpInputFile, &uiImageWidth, &uiImageHeight, &SourceFormat)) == 0)
 		{
-			Print(" Error loading input file.\n\n");
 			return;
-		}
-
-		Print(" Information:\n");
-
-		// Display input file info.
-		Print("  Width: %d\n", ilGetInteger(IL_IMAGE_WIDTH));
-		Print("  Height: %d\n", ilGetInteger(IL_IMAGE_HEIGHT));
-		Print("  BPP: %d\n\n", ilGetInteger(IL_IMAGE_BYTES_PER_PIXEL));
-
-		iType = ilGetInteger(IL_IMAGE_TYPE);
-		bFloat = iType == IL_FLOAT || iType == IL_DOUBLE || iType == IL_HALF;
-		SourceFormat = bFloat ? IMAGE_FORMAT_RGBA32323232F : IMAGE_FORMAT_RGBA8888;
-
-		if(bFloat)
-		{
-			iType = ilGetInteger(IL_IMAGE_FORMAT);
-			CreateOptions.ImageFormat = (iType == IL_RGBA || iType == IL_BGRA) ? AlphaFormat : NormalFormat;
-		}
-		else
-		{
-			CreateOptions.ImageFormat = ilGetInteger(IL_IMAGE_BYTES_PER_PIXEL) == 4 ? AlphaFormat : NormalFormat;
 		}
 
 		Print(" Creating texture:\n");
 
-		// Convert input file to RGBA.
-		if(!ilConvertImage(IL_RGBA, bFloat ? IL_FLOAT : IL_UNSIGNED_BYTE))
-		{
-			Print("  Error converting input file.\n\n");
-			return;
-		}
-
-		uiImageWidth = (vlUInt)ilGetInteger(IL_IMAGE_WIDTH);
-		uiImageHeight = (vlUInt)ilGetInteger(IL_IMAGE_HEIGHT);
-		lpSourceData = ilGetData();
-		lpDistanceData = 0;
-
-		// Replace the alpha channel with a distance field.
-		if(bDistanceAlpha && !bFloat)
-		{
-			uiDestWidth = uiImageWidth / uiDistanceAlphaReduce;
-			uiDestHeight = uiImageHeight / uiDistanceAlphaReduce;
-
-			if(uiDestWidth == 0)
-				uiDestWidth = 1;
-			if(uiDestHeight == 0)
-				uiDestHeight = 1;
-
-			lpDistanceData = (vlByte *)malloc(uiDestWidth * uiDestHeight * 4);
-
-			if(lpDistanceData == 0)
-			{
-				Print("  Error allocating distance field.\n\n");
-				return;
-			}
-
-			bClipped = vlFalse;
-
-			if(!vlImageConvertToDistanceField(lpSourceData, lpDistanceData, uiImageWidth, uiImageHeight, uiDestWidth, uiDestHeight, sDistanceAlphaSpread, bDistanceAlphaThreshold, &bClipped))
-			{
-				Print("  Error creating distance field:\n%s\n\n", vlGetLastError());
-				free(lpDistanceData);
-				return;
-			}
-
-			if(bClipped)
-			{
-				Print("  Warning: the distance field reaches the edge of the image and has been clipped.\n");
-			}
-
-			lpSourceData = lpDistanceData;
-			uiImageWidth = uiDestWidth;
-			uiImageHeight = uiDestHeight;
-
-			// The distance field always needs an alpha channel.
-			CreateOptions.ImageFormat = AlphaFormat;
-		}
-
-		// Create vtf file.
 		if(!vlImageCreateMultipleEx(uiImageWidth, uiImageHeight, 1, 1, 1, &lpSourceData, &CreateOptions, SourceFormat))
 		{
 			Print("  Error creating vtf file:\n%s\n\n", vlGetLastError());
-			free(lpDistanceData);
+			free(lpSourceData);
 			return;
 		}
 
-		free(lpDistanceData);
+		free(lpSourceData);
 
-		CreateOutputPath(lpVTFFile, lpInputFile, "vtf");
-
-		// Write vtf file.
-		Print("  Writing %s...\n", lpVTFFile);
-		if(!vlImageSave(lpVTFFile))
+		if(!SaveTexture(lpInputFile))
 		{
-			Print(" Error creating vtf file:\n%s\n\n", vlGetLastError());
 			return;
-		}
-		Print("  %s written.\n\n", lpVTFFile);
-
-		// Do we build a material?
-		if(lpShader != 0)
-		{
-			Print(" Creating material:\n");
-
-			// We need to constuct a $basetexture string, to do this we need the path
-			// of the vtf file relative to the materials folder.  If we arn't in a
-			// materials folder we can't do this.
-			if((lpTemp = stristr(lpVTFFile, "materials" PATH_SEPARATOR_STRING)) == 0)
-			{
-				Print("  Error creating vmt: texture is not in a ..." PATH_SEPARATOR_STRING "materials" PATH_SEPARATOR_STRING " folder.\n\n");
-			}
-			else
-			{
-				strcpy(lpVMTFile, lpVTFFile);
-				strcpy(strrchr(lpVMTFile, '.'), ".vmt");
-
-				strcpy(lpVMTBaseTexture, lpTemp + strlen("materials" PATH_SEPARATOR_STRING));
-				*strrchr(lpVMTBaseTexture, '.') = '\0';
-				strrpl(lpVMTBaseTexture, PATH_SEPARATOR, '/');
-
-				vlMaterialCreate(lpShader); // Create the root node.
-				vlMaterialGetFirstNode(); // Go to the root node.
-				vlMaterialAddNodeString("$basetexture", lpVMTBaseTexture); // Add a string node to the root node.
-
-				// Add the custom parameters.
-				for(i = 0; i < uiParameterCount; i++)
-				{
-					// Figure out if the parameter is a string, single or integer.
-
-					if(sscanf(lpParameters[i][1], "%d%s", &iTest, cTest) == 1)
-					{
-						// We can interpet the string as an integer, assume it is one.
-						vlMaterialAddNodeInteger(lpParameters[i][0], iTest);
-					}
-					else if(sscanf(lpParameters[i][1], "%f%s", &sTest, cTest) == 1)
-					{
-						// We can interpet the string as an single, assume it is one.
-						vlMaterialAddNodeSingle(lpParameters[i][0], sTest);
-					}
-					else
-					{
-						// The string must be a string...
-						vlMaterialAddNodeString(lpParameters[i][0], lpParameters[i][1]);
-					}
-				}
-
-				// Write vmt file.
-				Print("  Writing %s...\n", lpVMTFile);
-				if(!vlMaterialSave(lpVMTFile))
-				{
-					Print("Error creating vtf file:\n%s\n\n", vlGetLastError());
-					return;
-				}
-				Print("  %s written.\n\n", lpVMTFile);
-			}
 		}
 	}
 	else

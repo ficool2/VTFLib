@@ -63,6 +63,7 @@ Correct vtfcmd usage:
  -cmethod <string>        (Compression method: deflate or zstd.)
  -alphaformat <string>    (Output format to use on alpha textures.)
  -srgb                    (Whether to treat image as sRGB colour space or not)
+ -normal                  (Treat image as a normal map; re-normalizes resized images and mipmaps.)
  -flag <string>           (Output flags to set.)
  -resize                  (Resize the input to a power of 2.)
  -rmethod <string>        (Resize method to use.)
@@ -78,6 +79,7 @@ Correct vtfcmd usage:
  -dspread <single>        (Width of the distance field gradient in output pixels.)
  -dreduce <integer>       (Shrink the image by this factor after computing the field.)
  -dthreshold <integer>    (Source alpha above which a pixel is inside the shape.)
+ -animate                 (Combine all input images into one animated texture.)
  -nomipmaps               (Don't generate mipmaps.)
  -mfilter <string>        (Mipmap filter to use.)
  -stripmips               (Strip all mipmaps, same as -keepmips 1.)
@@ -98,6 +100,7 @@ vtfcmd.exe -file "C:\texture1.bmp" -file "C:\texture2.bmp" -format "dxt1"
 vtfcmd.exe -folder "C:\input\*.tga" -output "C:\output" -recurse -pause
 vtfcmd.exe -folder "C:\output\*.vtf" -output "C:\input" -exportformat "jpg"
 vtfcmd.exe -folder "C:\textures\*.vtf" -stripmips
+vtfcmd.exe -folder "C:\frames\*.png" -animate -format bc7 -alphaformat bc7 -version 7.6 -nomipmaps
 ```
 
 ## Program Copyright-Permissions
